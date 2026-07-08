@@ -594,7 +594,7 @@ mod tests {
         let compiled = compile_source(
             r#"
                 let mut total = 0;
-                for (let mut i = 0; i < 200000; i = i + 1) {
+                for i in 0..200000 {
                     total = total + i;
                 }
                 total;
