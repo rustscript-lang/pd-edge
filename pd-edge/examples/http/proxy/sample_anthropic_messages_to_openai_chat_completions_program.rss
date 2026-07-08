@@ -117,7 +117,7 @@ struct StreamState {
     sent_terminal_chunk: bool,
 }
 
-fn starts_with(value, prefix) {
+fn starts_with(value: string, prefix: string) -> bool {
     let prefix_len = prefix.length;
     if value.length < prefix_len => {
         false
@@ -126,7 +126,7 @@ fn starts_with(value, prefix) {
     }
 }
 
-fn openai_chat_id(message_id) {
+fn openai_chat_id(message_id: string) -> string {
     if message_id == "" => {
         "chatcmpl-anthropic"
     } else => {
@@ -134,7 +134,7 @@ fn openai_chat_id(message_id) {
     }
 }
 
-fn openai_finish_reason(stop_reason) {
+fn openai_finish_reason(stop_reason: string) -> string {
     match stop_reason {
         "max_tokens" => "length",
         "tool_use" => "tool_calls",
@@ -146,7 +146,12 @@ fn openai_finish_reason(stop_reason) {
     }
 }
 
-fn openai_stream_chunk<TDelta, TFinish>(message_id, model, delta, finish_reason) {
+fn openai_stream_chunk<TDelta, TFinish>(
+    message_id: string,
+    model: string,
+    delta: TDelta,
+    finish_reason: TFinish
+) -> OpenAiStreamChunk<TDelta, TFinish> {
     let choice = {
         index: 0,
         delta: delta,
@@ -163,11 +168,11 @@ fn openai_stream_chunk<TDelta, TFinish>(message_id, model, delta, finish_reason)
     chunk
 }
 
-fn write_sse_data(payload) {
+fn write_sse_data(payload: string) {
     http::response::stream::write("data: " + payload + "\n\n")
 }
 
-fn process_stream_event(event_data, state) {
+fn process_stream_event(event_data: string, state: StreamState) -> StreamState {
     let mut next_stream_id = state.stream_id;
     let mut next_stream_model = state.stream_model;
     let mut next_stream_stop_reason = state.stream_stop_reason;
@@ -435,18 +440,18 @@ if upstream_status != 200 {
 
     let prompt_tokens = usage.input_tokens;
     let completion_tokens = usage.output_tokens;
-    let response_usage = {
+    let response_usage: OpenAiUsage = {
         prompt_tokens: prompt_tokens,
         completion_tokens: completion_tokens,
         total_tokens: prompt_tokens + completion_tokens,
     };
-    let assistant_message = {
+    let assistant_message: OpenAiAssistantMessage = {
         role: "assistant",
         content: text,
         refusal: null,
         annotations: [],
     };
-    let choice = {
+    let choice: OpenAiChoice = {
         index: 0,
         message: assistant_message,
         logprobs: null,

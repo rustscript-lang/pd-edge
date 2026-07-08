@@ -164,7 +164,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
 dependencies = [
  "axum-core",
- "base64",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -183,10 +182,8 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "sha1",
  "sync_wrapper",
  "tokio",
- "tokio-tungstenite",
  "tower",
  "tower-layer",
  "tower-service",
@@ -1857,23 +1854,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pd-controller"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64",
- "pd-edge",
- "pd-vm",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "pd-edge"
 version = "0.1.0"
 dependencies = [
@@ -1938,24 +1918,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pd-edge-http-minimal"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "http-body-util",
- "hyper",
- "hyper-util",
- "mimalloc",
- "parking_lot",
- "pd-edge-abi",
- "pd-vm",
- "reqwest",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "pd-host-function"
 version = "0.1.0"
 dependencies = [
@@ -1987,16 +1949,6 @@ dependencies = [
  "syn",
  "tokio",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "pd-vm-wasm"
-version = "0.1.0"
-dependencies = [
- "pd-edge-abi",
- "pd-vm",
- "serde",
- "serde_json",
 ]
 
 [[package]]

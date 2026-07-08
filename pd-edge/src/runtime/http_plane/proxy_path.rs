@@ -1421,14 +1421,11 @@ mod tests {
                 use http;
                 use proxy;
 
-                let upstream = http::exchange::prepare_default_upstream(
-                    "127.0.0.1",
-                    8080,
-                    "1.1",
-                    []
-                );
-                let downstream = proxy::stream::downstream();
-                let upstream_stream = proxy::stream::exchange(upstream);
+                let upstream: int = http::exchange::default_upstream();
+                http::exchange::set_target(upstream, "127.0.0.1", 8080);
+                http::exchange::set_version(upstream, "1.1");
+                let downstream: int = proxy::stream::downstream();
+                let upstream_stream: int = proxy::stream::exchange(upstream);
                 proxy::forward_native(downstream, upstream_stream);
             "#,
         );
@@ -1445,14 +1442,11 @@ mod tests {
                 use http;
                 use proxy;
 
-                let upstream = http::exchange::prepare_default_upstream(
-                    "127.0.0.1",
-                    8080,
-                    "1.1",
-                    []
-                );
-                let downstream = proxy::stream::downstream();
-                let upstream_stream = proxy::stream::exchange(upstream);
+                let upstream: int = http::exchange::default_upstream();
+                http::exchange::set_target(upstream, "127.0.0.1", 8080);
+                http::exchange::set_version(upstream, "1.1");
+                let downstream: int = proxy::stream::downstream();
+                let upstream_stream: int = proxy::stream::exchange(upstream);
                 proxy::forward(downstream, upstream_stream, 1024);
             "#,
         );
@@ -1642,22 +1636,16 @@ mod tests {
                 }}
 
                 let downstream_version = http::request::get_http_version();
-                let upstream = http::exchange::prepare_default_upstream(
-                    "{upstream_host}",
-                    {upstream_port},
-                    "1.1",
-                    [
-                        "x-downstream-version", downstream_version,
-                        "x-bench-program-header", "program-proxy"
-                    ]
-                );
-                let downstream = proxy::stream::downstream();
-                let upstream_stream = proxy::stream::exchange(upstream);
+                let upstream: int = http::exchange::default_upstream();
+                http::exchange::set_target(upstream, "{upstream_host}", {upstream_port});
+                http::exchange::set_version(upstream, "1.1");
+                http::exchange::set_header(upstream, "x-downstream-version", downstream_version);
+                http::exchange::set_header(upstream, "x-bench-program-header", "program-proxy");
+                let downstream: int = proxy::stream::downstream();
+                let upstream_stream: int = proxy::stream::exchange(upstream);
                 proxy::forward_native(downstream, upstream_stream);
-                http::response::set_headers([
-                    "x-proxy-test", "ok",
-                    "x-downstream-version", downstream_version
-                ]);
+                http::response::set_header("x-proxy-test", "ok");
+                http::response::set_header("x-downstream-version", downstream_version);
             "#,
             upstream_host = upstream_addr.ip(),
             upstream_port = upstream_addr.port(),

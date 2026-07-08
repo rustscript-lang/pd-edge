@@ -140,9 +140,8 @@ async fn send_downstream_mtls_https_request(
                     }
                     buffered.extend_from_slice(&chunk[..read]);
                 }
-                let body =
-                    String::from_utf8_lossy(&buffered[head_len..head_len + content_length])
-                        .into_owned();
+                let body = String::from_utf8_lossy(&buffered[head_len..head_len + content_length])
+                    .into_owned();
                 buffered.drain(..head_len + content_length);
                 return Ok((status, headers, body));
             }
@@ -893,14 +892,12 @@ async fn proxy_forward_native_overlays_response_headers() {
         use http;
         use proxy;
 
-        let upstream = http::exchange::default_upstream();
+        let upstream: int = http::exchange::default_upstream();
         http::exchange::set_target(upstream, "127.0.0.1", {});
-        let downstream = proxy::stream::downstream();
-        let upstream_stream = proxy::stream::exchange(upstream);
+        let downstream: int = proxy::stream::downstream();
+        let upstream_stream: int = proxy::stream::exchange(upstream);
         proxy::forward_native(downstream, upstream_stream);
-        http::response::set_headers([
-            "x-bench-response-header", "program-proxy"
-        ]);
+        http::response::set_header("x-bench-response-header", "program-proxy");
     "#,
         upstream_addr.port()
     );
@@ -1790,10 +1787,10 @@ async fn http_request_body_chunk_api_reads_in_chunks() {
     let source = r#"
         use http;
 
-        let first = http::request::body::next_chunk(4);
-        let second = http::request::body::next_chunk(4);
-        let rest = http::request::body::next_chunk(64);
-        let done = http::request::body::eof();
+        let first: string = http::request::body::next_chunk(4);
+        let second: string = http::request::body::next_chunk(4);
+        let rest: string = http::request::body::next_chunk(64);
+        let done: bool = http::request::body::eof();
         if done {
             http::response::set_body(first + second + rest);
         } else {
@@ -4521,23 +4518,35 @@ async fn http_proxy_https_listener_explicit_handoff_exposes_downstream_mtls_and_
         Some("https")
     );
     assert_eq!(
-        first.headers.get("x-configuration-mode").map(String::as_str),
+        first
+            .headers
+            .get("x-configuration-mode")
+            .map(String::as_str),
         Some("explicit")
     );
-    assert_eq!(first.headers.get("x-sni").map(String::as_str), Some("localhost"));
+    assert_eq!(
+        first.headers.get("x-sni").map(String::as_str),
+        Some("localhost")
+    );
     assert_eq!(
         first.headers.get("x-phase").map(String::as_str),
         Some("plaintext-ready")
     );
     assert_eq!(
-        first.headers.get("x-needs-configuration").map(String::as_str),
+        first
+            .headers
+            .get("x-needs-configuration")
+            .map(String::as_str),
         Some("false")
     );
     assert_eq!(
         first.headers.get("x-client-cert").map(String::as_str),
         Some(expected_client_cert.as_str())
     );
-    assert_eq!(first.headers.get("x-reused").map(String::as_str), Some("false"));
+    assert_eq!(
+        first.headers.get("x-reused").map(String::as_str),
+        Some("false")
+    );
     assert_eq!(first.body, "POST|/downstream-mtls-sni|mtls-body");
 
     let second = send_downstream_mtls_https_request(
@@ -4554,26 +4563,32 @@ async fn http_proxy_https_listener_explicit_handoff_exposes_downstream_mtls_and_
         Some("https")
     );
     assert_eq!(
-        second.headers.get("x-configuration-mode").map(String::as_str),
+        second
+            .headers
+            .get("x-configuration-mode")
+            .map(String::as_str),
         Some("restored")
     );
-    assert_eq!(
-        second.headers.get("x-sni"),
-        first.headers.get("x-sni"),
-    );
+    assert_eq!(second.headers.get("x-sni"), first.headers.get("x-sni"),);
     assert_eq!(
         second.headers.get("x-phase").map(String::as_str),
         Some("plaintext-ready")
     );
     assert_eq!(
-        second.headers.get("x-needs-configuration").map(String::as_str),
+        second
+            .headers
+            .get("x-needs-configuration")
+            .map(String::as_str),
         Some("false")
     );
     assert_eq!(
         second.headers.get("x-client-cert"),
         first.headers.get("x-client-cert"),
     );
-    assert_eq!(second.headers.get("x-reused").map(String::as_str), Some("true"));
+    assert_eq!(
+        second.headers.get("x-reused").map(String::as_str),
+        Some("true")
+    );
     assert_eq!(second.body, first.body);
 
     http_handle.abort();

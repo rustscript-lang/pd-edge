@@ -2,6 +2,6 @@
 use http;
 use proxy;
 
-pub fn as_stream() {
+pub fn as_stream() -> int {
     proxy::stream::exchange(http::exchange::default_upstream())
 }
