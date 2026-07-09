@@ -1,19 +1,17 @@
 # pd-edge
 
-`pd-edge` is the edge data-plane runtime plus the edge ABI split from the original `project-d` history.
+`pd-edge` is the edge data-plane runtime plus the edge ABI for running VM programs at the edge.
 
-## Repository split
+## Related projects
 
 - RustScript core VM and standard library: https://github.com/rustscript-lang/rustscript
 - CLR VM: https://github.com/rustscript-lang/rustscript-clr-vm
 - Edge runtime and ABI: https://github.com/rustscript-lang/pd-edge
 - Controller: https://github.com/rustscript-lang/pd-controller
 
-## Local crates
+## Cargo usage
 
-The split keeps VM and ABI crates local so the edge runtime test suite can run without unpublished remote dependencies.
-
-For downstream Cargo manifests, the intended repository references are:
+The workspace uses sibling RustScript crates during local development. For downstream Cargo manifests, use these repository references:
 
 ```toml
 pd-vm = { git = "https://github.com/rustscript-lang/rustscript", package = "pd-vm" }
