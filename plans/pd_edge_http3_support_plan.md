@@ -34,7 +34,7 @@ That gives the properties this effort needs:
 - Add shared upstream HTTP/3 session reuse and stream multiplexing.
 - Track downstream HTTP/3 sessions and request streams outside per-request `ProxyVmContext`, the same way HTTP/2 now does.
 - Make carrier attachment explicit in generic exchange state so HTTP/1.1, HTTP/2, and HTTP/3 are sibling realizations.
-- Keep the design aligned with the layered DAG model in [pd-edge/README.md](../pd-edge/README.md) and [pd-edge/docs/full-dag.md](../pd-edge/docs/full-dag.md).
+- Keep the design aligned with the layered DAG model in [README.md](../README.md) and [docs/full-dag.md](../docs/full-dag.md).
 
 ## Non-Goals For The First Milestone
 
@@ -51,10 +51,10 @@ That gives the properties this effort needs:
 
 The current runtime already has the right high-level split for extending to HTTP/3:
 
-- generic HTTP exchange state lives in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs)
-- HTTP/2 carrier policy lives in [pd-edge/src/abi_impl/http2/model.rs](../pd-edge/src/abi_impl/http2/model.rs), [pd-edge/src/abi_impl/http2/upstream.rs](../pd-edge/src/abi_impl/http2/upstream.rs), and [pd-edge/src/abi_impl/http2/downstream.rs](../pd-edge/src/abi_impl/http2/downstream.rs)
-- downstream HTTP requests are admitted through [pd-edge/src/runtime/http_plane/proxy_path.rs](../pd-edge/src/runtime/http_plane/proxy_path.rs)
-- shared runtime stores are initialized in [pd-edge/src/runtime.rs](../pd-edge/src/runtime.rs)
+- generic HTTP exchange state lives in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs)
+- HTTP/2 carrier policy lives in [src/abi_impl/http2/model.rs](../src/abi_impl/http2/model.rs), [src/abi_impl/http2/upstream.rs](../src/abi_impl/http2/upstream.rs), and [src/abi_impl/http2/downstream.rs](../src/abi_impl/http2/downstream.rs)
+- downstream HTTP requests are admitted through [src/runtime/http_plane/proxy_path.rs](../src/runtime/http_plane/proxy_path.rs)
+- shared runtime stores are initialized in [src/runtime.rs](../src/runtime.rs)
 
 Implemented today:
 
@@ -74,9 +74,9 @@ Still missing for HTTP/3:
 
 Important existing constraints:
 
-- downstream HTTP today is served through the `axum` or `hyper` TCP server path in [pd-edge/src/runtime/http_plane/proxy_path.rs](../pd-edge/src/runtime/http_plane/proxy_path.rs)
-- upstream HTTP/1.1 and fallback HTTP/2 still rely on `reqwest::Client` in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs)
-- the current UDP subsystem in [pd-edge/src/abi_impl/transport/state.rs](../pd-edge/src/abi_impl/transport/state.rs) is datagram-oriented and does not model QUIC connection state
+- downstream HTTP today is served through the `axum` or `hyper` TCP server path in [src/runtime/http_plane/proxy_path.rs](../src/runtime/http_plane/proxy_path.rs)
+- upstream HTTP/1.1 and fallback HTTP/2 still rely on `reqwest::Client` in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs)
+- the current UDP subsystem in [src/abi_impl/transport/state.rs](../src/abi_impl/transport/state.rs) is datagram-oriented and does not model QUIC connection state
 
 So the current answer to "can HTTP/3 just reuse the HTTP/2 design?" is: only at the generic exchange boundary. Below that, HTTP/3 needs a new transport and carrier stack.
 
@@ -138,11 +138,11 @@ Recommended internal DAGs:
   - response body ready
   - closed or reset
 
-This is the HTTP/3 equivalent of the current HTTP/2 split in [pd-edge/src/abi_impl/http2/model.rs](../pd-edge/src/abi_impl/http2/model.rs), but with QUIC separated from HTTP semantics instead of being hidden inside one carrier module.
+This is the HTTP/3 equivalent of the current HTTP/2 split in [src/abi_impl/http2/model.rs](../src/abi_impl/http2/model.rs), but with QUIC separated from HTTP semantics instead of being hidden inside one carrier module.
 
 ### 3. Extend generic HTTP carrier bookkeeping
 
-`HttpCarrierKind` and `HttpCarrierRef` in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs) should grow a third carrier family:
+`HttpCarrierKind` and `HttpCarrierRef` in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs) should grow a third carrier family:
 
 - `HttpCarrierKind::Http3`
 - `HttpCarrierRef::DownstreamHttp3Stream(Http3StreamRef)`
@@ -192,7 +192,7 @@ HTTP/3 should follow the same rollout order as HTTP/2, but even more strongly:
 
 ### 1. Add explicit upstream HTTP/3 selection policy
 
-The current HTTP/2 selector in [pd-edge/src/abi_impl/http2/model.rs](../pd-edge/src/abi_impl/http2/model.rs) is based on target scheme and ALPN hints.
+The current HTTP/2 selector in [src/abi_impl/http2/model.rs](../src/abi_impl/http2/model.rs) is based on target scheme and ALPN hints.
 
 HTTP/3 should not auto-activate for every `https://` target. Initial policy should be explicit:
 
@@ -217,7 +217,7 @@ This is the main reason to add `http::exchange::set_version(...)` early for outb
 
 ### 2. Add shared upstream QUIC and HTTP/3 session state
 
-`SharedState` in [pd-edge/src/runtime.rs](../pd-edge/src/runtime.rs) currently keeps:
+`SharedState` in [src/runtime.rs](../src/runtime.rs) currently keeps:
 
 - `client: reqwest::Client`
 - `upstream_client_cache`
@@ -245,7 +245,7 @@ Important rule:
 
 ### 3. Keep `reqwest` for HTTP/1.1 and HTTP/2 fallback
 
-Do not try to force milestone-one HTTP/3 through the existing `reqwest::Client` path in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs).
+Do not try to force milestone-one HTTP/3 through the existing `reqwest::Client` path in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs).
 
 Recommended split:
 
@@ -274,7 +274,7 @@ Internal detach path for an HTTP/3-backed exchange:
 - runtime attaches the request stream to the exchange
 - exchange response and body readiness are satisfied through the generic HTTP exchange APIs
 
-This should mirror the current `start_upstream_response_via_http2(...)` split in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs), but with an HTTP/3 carrier module and QUIC-backed body source.
+This should mirror the current `start_upstream_response_via_http2(...)` split in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs), but with an HTTP/3 carrier module and QUIC-backed body source.
 
 ### 5. Reuse TLS policy only as configuration input, not as a transport DAG
 
@@ -298,7 +298,7 @@ So the existing TLS API can remain useful as configuration input, but QUIC and H
 
 ### 1. Treat downstream HTTP/3 as a new ingress mode, not as HTTP auto-promotion from TCP
 
-The current downstream HTTP runtime in [pd-edge/src/runtime/http_plane/proxy_path.rs](../pd-edge/src/runtime/http_plane/proxy_path.rs) has two main admission shapes:
+The current downstream HTTP runtime in [src/runtime/http_plane/proxy_path.rs](../src/runtime/http_plane/proxy_path.rs) has two main admission shapes:
 
 - plain HTTP over TCP
 - HTTPS over TCP plus TLS, with optional auto-promotion into HTTP
@@ -394,12 +394,12 @@ Upstream Alt-Svc caching can wait. Downstream advertisement is useful immediatel
 
 Recommended new modules:
 
-- `pd-edge/src/abi_impl/quic/`
+- `src/abi_impl/quic/`
   - `mod.rs`
   - `model.rs`
   - `upstream.rs`
   - `downstream.rs`
-- `pd-edge/src/abi_impl/http3/`
+- `src/abi_impl/http3/`
   - `mod.rs`
   - `model.rs`
   - `upstream.rs`
@@ -411,9 +411,9 @@ Even if milestone one keeps some QUIC types physically inside `http3/`, the targ
 
 `RuntimeServices` and `SharedState` should add HTTP/3-aware stores in:
 
-- [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs)
-- [pd-edge/src/runtime.rs](../pd-edge/src/runtime.rs)
-- [pd-edge/src/cache.rs](../pd-edge/src/cache.rs)
+- [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs)
+- [src/runtime.rs](../src/runtime.rs)
+- [src/cache.rs](../src/cache.rs)
 
 Recommended new store limits:
 
@@ -424,7 +424,7 @@ And corresponding `RuntimeStoreLimits` fields plus CLI flags similar to the curr
 
 ### C. Extend carrier-aware response body readers
 
-`UpstreamResponseSource` and related body-tracking code in [pd-edge/src/abi_impl/http/state.rs](../pd-edge/src/abi_impl/http/state.rs) should gain an HTTP/3-backed variant similar to the current explicit HTTP/2 response path.
+`UpstreamResponseSource` and related body-tracking code in [src/abi_impl/http/state.rs](../src/abi_impl/http/state.rs) should gain an HTTP/3-backed variant similar to the current explicit HTTP/2 response path.
 
 This is where generic body APIs continue to work while carrier-specific reset, GOAWAY, and EOF behavior are translated into generic exchange semantics.
 
@@ -441,7 +441,7 @@ The first milestone can run entirely on the existing generic HTTP ABI and versio
 
 ### E. Update sample echo and test fixtures
 
-Extend [pd-edge/src/sample_echo.rs](../pd-edge/src/sample_echo.rs) with:
+Extend [src/sample_echo.rs](../src/sample_echo.rs) with:
 
 - an HTTP/3 listener
 - shared certificate configuration for HTTPS and HTTP/3
@@ -518,7 +518,7 @@ This milestone should deliver real user value without changing downstream admiss
 ### Fixture and sample tests
 
 - extend `sample_echo` tests with HTTP/3 listener coverage
-- add local HTTP/3 upstream fixtures similar to the current HTTP/2 sample servers in [pd-edge/tests/proxy_tests/support.rs](../pd-edge/tests/proxy_tests/support.rs)
+- add local HTTP/3 upstream fixtures similar to the current HTTP/2 sample servers in [tests/proxy_tests/support.rs](../tests/proxy_tests/support.rs)
 
 ## Recommended Library Direction
 

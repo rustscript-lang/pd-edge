@@ -2,7 +2,7 @@
 
 ## 1. `ProxyVmContext` is a God Object
 
-**File:** `pd-edge/src/abi_impl/http/state.rs:562-605`
+**File:** `src/abi_impl/http/state.rs:562-605`
 
 `ProxyVmContext` has **40+ fields** covering TCP, TLS, UDP, HTTP exchanges, WebSocket, WebRTC, proxy streams, rate limiting, and IO handles — all in one flat struct. This violates the layered-DAG model's own principle that *each subsystem owns its own state*.
 

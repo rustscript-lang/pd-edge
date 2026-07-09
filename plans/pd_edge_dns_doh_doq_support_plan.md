@@ -49,16 +49,16 @@ DNS query goals.
 The runtime already has the lower-level families needed for the carriers:
 
 - UDP and TCP transport state live under
-  [`pd-edge/src/abi_impl/transport/`](../pd-edge/src/abi_impl/transport/)
+  [`src/abi_impl/transport/`](../src/abi_impl/transport/)
 - generic HTTP exchange state lives under
-  [`pd-edge/src/abi_impl/http/`](../pd-edge/src/abi_impl/http/)
+  [`src/abi_impl/http/`](../src/abi_impl/http/)
 - HTTP/3 and QUIC-backed runtime work already exists under
-  [`pd-edge/src/abi_impl/http3/`](../pd-edge/src/abi_impl/http3/)
+  [`src/abi_impl/http3/`](../src/abi_impl/http3/)
 
 Important current constraints:
 
 - there is no `dns` namespace in [`pd-edge-abi/src/abi_spec/`](../pd-edge-abi/src/abi_spec/)
-- there is no `dns`, `doh`, or `doq` implementation under [`pd-edge/src/abi_impl/`](../pd-edge/src/abi_impl/)
+- there is no `dns`, `doh`, or `doq` implementation under [`src/abi_impl/`](../src/abi_impl/)
 - downstream UDP is still a reserved placeholder in the one-shot HTTP runtime, so raw downstream
   DNS listener support is not already available
 
@@ -213,13 +213,13 @@ HTTP runtime. That is useful work, but it should not block upstream resolution s
 
 Recommended new modules:
 
-- `pd-edge/src/abi_impl/dns/mod.rs`
-- `pd-edge/src/abi_impl/dns/model.rs`
-- `pd-edge/src/abi_impl/dns/codec.rs`
-- `pd-edge/src/abi_impl/dns/upstream.rs`
-- `pd-edge/src/abi_impl/dns/downstream.rs`
-- `pd-edge/src/abi_impl/dns/doh.rs`
-- `pd-edge/src/abi_impl/dns/doq.rs`
+- `src/abi_impl/dns/mod.rs`
+- `src/abi_impl/dns/model.rs`
+- `src/abi_impl/dns/codec.rs`
+- `src/abi_impl/dns/upstream.rs`
+- `src/abi_impl/dns/downstream.rs`
+- `src/abi_impl/dns/doh.rs`
+- `src/abi_impl/dns/doq.rs`
 
 The split should reflect the DAG model:
 
@@ -255,8 +255,8 @@ and HTTP runtime.
 - add `dns` feature scaffolding
 - define generic DNS query frontiers
 - add ABI symbols and stubs
-- update [`pd-edge/README.md`](../pd-edge/README.md) and
-  [`pd-edge/docs/full-dag.md`](../pd-edge/docs/full-dag.md) with DNS attach and detach edges
+- update [`README.md`](../README.md) and
+  [`docs/full-dag.md`](../docs/full-dag.md) with DNS attach and detach edges
 
 ### Milestone 1: Upstream raw DNS over UDP and TCP
 

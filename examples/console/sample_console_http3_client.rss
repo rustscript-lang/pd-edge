@@ -1,5 +1,5 @@
 // Run with:
-// cargo run -p pd-edge --bin pd-edge-console -- --program pd-edge/examples/console/sample_console_http3_client.rss --run -- 127.0.0.1 GET
+// cargo run -p pd-edge --bin pd-edge-console -- --program examples/console/sample_console_http3_client.rss --run -- 127.0.0.1 GET
 // Pass "-" as the body argument to stream the request body from stdin.
 // Pass "false" as the fourth argument to disable TLS certificate verification.
 

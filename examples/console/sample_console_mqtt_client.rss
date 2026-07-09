@@ -1,5 +1,5 @@
 // Run with:
-// cargo run -p pd-edge --bin pd-edge-console --features mqtt -- --program pd-edge/examples/console/sample_console_mqtt_client.rss --run -- 127.0.0.1 mqtt demo/topic hello "" 0
+// cargo run -p pd-edge --bin pd-edge-console --features mqtt -- --program examples/console/sample_console_mqtt_client.rss --run -- 127.0.0.1 mqtt demo/topic hello "" 0
 //
 // Args:
 // - host

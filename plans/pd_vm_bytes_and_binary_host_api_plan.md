@@ -115,7 +115,7 @@ The transport/runtime surface is currently mixed:
 - `webrtc::connection::*` still exposes binary messages only as base64 strings in
   [`pd-edge-abi/src/abi_spec/webrtc.rs`](../pd-edge-abi/src/abi_spec/webrtc.rs)
 - text-oriented TCP reads still pass raw bytes through `String::from_utf8_lossy(...)` in
-  [`pd-edge/src/abi_impl/transport/tcp.rs`](../pd-edge/src/abi_impl/transport/tcp.rs)
+  [`src/abi_impl/transport/tcp.rs`](../src/abi_impl/transport/tcp.rs)
 
 So the current answer to "can RSS implement packet protocols cleanly today?" is: only partially.
 Binary work is possible in small slices, but the runtime still lacks a stable first-class `bytes`

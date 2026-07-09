@@ -25,7 +25,7 @@ That gives the three properties this effort needs:
 - Add real multiplexing so multiple exchanges can share one HTTP/2 session.
 - Allow HTTP/2 to attach to TLS plaintext after ALPN `h2` or directly to TCP for cleartext prior-knowledge `h2c`.
 - Make downgrade or alternate realization explicit: a generic `http` exchange may be carried by `http1` or `http2`.
-- Keep the design consistent with the current DAG model in [pd-edge/README.md](pd-edge/README.md).
+- Keep the design consistent with the current DAG model in [README.md](README.md).
 
 ## Non-Goals For The First Milestone
 
@@ -37,7 +37,7 @@ That gives the three properties this effort needs:
 
 ## Current State
 
-The code now has a generic `http::exchange::*` ABI in [pd-edge-abi/src/abi_spec/http.exchange.rs](pd-edge-abi/src/abi_spec/http.exchange.rs) backed by an explicit internal split between generic HTTP exchange state in [pd-edge/src/abi_impl/http/state.rs](pd-edge/src/abi_impl/http/state.rs) and carrier-specific policy in [pd-edge/src/abi_impl/http1/mod.rs](pd-edge/src/abi_impl/http1/mod.rs) and [pd-edge/src/abi_impl/http2/mod.rs](pd-edge/src/abi_impl/http2/mod.rs).
+The code now has a generic `http::exchange::*` ABI in [pd-edge-abi/src/abi_spec/http.exchange.rs](pd-edge-abi/src/abi_spec/http.exchange.rs) backed by an explicit internal split between generic HTTP exchange state in [src/abi_impl/http/state.rs](src/abi_impl/http/state.rs) and carrier-specific policy in [src/abi_impl/http1/mod.rs](src/abi_impl/http1/mod.rs) and [src/abi_impl/http2/mod.rs](src/abi_impl/http2/mod.rs).
 
 Implemented today:
 
@@ -234,7 +234,7 @@ The first milestone should avoid overcommitting to a large `http2::*` ABI until 
 
 ### A. Split `HttpOutboundExchangeNode`
 
-`HttpOutboundExchangeNode` in [pd-edge/src/abi_impl/http/state.rs](pd-edge/src/abi_impl/http/state.rs) should stop owning its own transport DAGs directly.
+`HttpOutboundExchangeNode` in [src/abi_impl/http/state.rs](src/abi_impl/http/state.rs) should stop owning its own transport DAGs directly.
 
 Replace the current per-exchange ownership with:
 
@@ -255,7 +255,7 @@ The key missing piece today is that `HttpCarrierRef::Http2Stream { session_handl
 
 ### B. Add shared upstream HTTP session state
 
-`SharedState` in [pd-edge/src/runtime.rs](pd-edge/src/runtime.rs) currently shares a `reqwest::Client` and the TLS session cache across requests.
+`SharedState` in [src/runtime.rs](src/runtime.rs) currently shares a `reqwest::Client` and the TLS session cache across requests.
 
 HTTP/2 needs a new shared upstream session manager, for example:
 
@@ -323,7 +323,7 @@ Without that, multiplex will remain accidental or opaque rather than explicit.
 
 ### D. Introduce `http1` and `http2` internal modules
 
-Recommended new modules under [pd-edge/src/abi_impl/](pd-edge/src/abi_impl/):
+Recommended new modules under [src/abi_impl/](src/abi_impl/):
 
 - `http/`
   - generic exchange state and version-agnostic helpers
@@ -334,8 +334,8 @@ Recommended new modules under [pd-edge/src/abi_impl/](pd-edge/src/abi_impl/):
 
 This should be accompanied by documentation updates in:
 
-- [pd-edge/README.md](pd-edge/README.md)
-- [pd-edge/docs/full-dag.md](pd-edge/docs/full-dag.md)
+- [README.md](README.md)
+- [docs/full-dag.md](docs/full-dag.md)
 
 ## Downstream And Upstream Strategy
 
@@ -351,7 +351,7 @@ Reason:
 
 ### Downstream second
 
-The current downstream runtime creates one `ProxyVmContext` per request in [pd-edge/src/runtime/http_plane/proxy_path.rs](pd-edge/src/runtime/http_plane/proxy_path.rs).
+The current downstream runtime creates one `ProxyVmContext` per request in [src/runtime/http_plane/proxy_path.rs](src/runtime/http_plane/proxy_path.rs).
 
 That is compatible with individual HTTP/2 streams as long as the server stack does the demultiplexing first, but it is not enough to represent a visible downstream HTTP/2 session DAG with shared settings, stream IDs, resets, and GOAWAY.
 
@@ -496,7 +496,7 @@ Exit criteria:
 
 ## Test Plan
 
-Add or expand tests in [pd-edge/tests/proxy_tests/http.rs](pd-edge/tests/proxy_tests/http.rs) and related support code for:
+Add or expand tests in [tests/proxy_tests/http.rs](tests/proxy_tests/http.rs) and related support code for:
 
 - upstream exchange works over negotiated HTTP/2
 - two dynamic exchanges multiplex over one upstream HTTP/2 session

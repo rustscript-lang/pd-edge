@@ -48,20 +48,20 @@ boundary and attach it cleanly to the existing `tcp`, `tls`, `http2`, and later 
 The lower-level carrier pieces are already present:
 
 - generic HTTP exchange state lives in
-  [`pd-edge/src/abi_impl/http/state.rs`](../pd-edge/src/abi_impl/http/state.rs)
+  [`src/abi_impl/http/state.rs`](../src/abi_impl/http/state.rs)
 - HTTP/2 carrier state lives in
-  [`pd-edge/src/abi_impl/http2/`](../pd-edge/src/abi_impl/http2/)
+  [`src/abi_impl/http2/`](../src/abi_impl/http2/)
 - HTTP/3 carrier state lives in
-  [`pd-edge/src/abi_impl/http3/`](../pd-edge/src/abi_impl/http3/)
+  [`src/abi_impl/http3/`](../src/abi_impl/http3/)
 
 Important current facts:
 
 - response and exchange trailers are already readable on the HTTP side through
-  [`pd-edge/src/abi_impl/http/response.rs`](../pd-edge/src/abi_impl/http/response.rs) and
-  [`pd-edge/src/abi_impl/http/exchange.rs`](../pd-edge/src/abi_impl/http/exchange.rs)
+  [`src/abi_impl/http/response.rs`](../src/abi_impl/http/response.rs) and
+  [`src/abi_impl/http/exchange.rs`](../src/abi_impl/http/exchange.rs)
 - compile-time convenience wrappers already exist for HTTP under
-  [`pd-edge/src/compile.rs`](../pd-edge/src/compile.rs) and
-  [`pd-edge/stdlib/rss/http/upstream/`](../pd-edge/stdlib/rss/http/upstream/)
+  [`src/compile.rs`](../src/compile.rs) and
+  [`stdlib/rss/http/upstream/`](../stdlib/rss/http/upstream/)
 - there is still no `grpc` namespace in [`pd-edge-abi/src/abi_spec/`](../pd-edge-abi/src/abi_spec/)
 - there is no equivalent `edge/grpc/*` RSS convenience layer today
 - there is no descriptor-backed protobuf or JSON transcode engine in the runtime today
@@ -214,7 +214,7 @@ That means:
 ### 7. Add RSS-facing convenience modules, not RSS-level codecs
 
 The existing HTTP developer experience already includes convenience wrappers compiled in from
-[`pd-edge/src/compile.rs`](../pd-edge/src/compile.rs). gRPC should follow the same pattern.
+[`src/compile.rs`](../src/compile.rs). gRPC should follow the same pattern.
 
 Recommended additions:
 
@@ -251,14 +251,14 @@ gRPC frontier with more active message-stream nodes.
 
 Recommended new modules:
 
-- `pd-edge/src/abi_impl/grpc/mod.rs`
-- `pd-edge/src/abi_impl/grpc/model.rs`
-- `pd-edge/src/abi_impl/grpc/framing.rs`
-- `pd-edge/src/abi_impl/grpc/client.rs`
-- `pd-edge/src/abi_impl/grpc/server.rs`
-- `pd-edge/src/abi_impl/grpc/descriptor.rs`
-- `pd-edge/src/abi_impl/grpc/transcode.rs`
-- `pd-edge/src/abi_impl/grpc/gateway.rs`
+- `src/abi_impl/grpc/mod.rs`
+- `src/abi_impl/grpc/model.rs`
+- `src/abi_impl/grpc/framing.rs`
+- `src/abi_impl/grpc/client.rs`
+- `src/abi_impl/grpc/server.rs`
+- `src/abi_impl/grpc/descriptor.rs`
+- `src/abi_impl/grpc/transcode.rs`
+- `src/abi_impl/grpc/gateway.rs`
 
 The target split is:
 
@@ -277,7 +277,7 @@ Downstream gRPC is blocked until the runtime can emit response trailers explicit
 Recommended prerequisite work:
 
 - add downstream response trailer mutation APIs to
-  [`pd-edge/src/abi_impl/http/response.rs`](../pd-edge/src/abi_impl/http/response.rs)
+  [`src/abi_impl/http/response.rs`](../src/abi_impl/http/response.rs)
 - ensure streamed responses can finish with trailers
 - keep the trailer model valid across HTTP/2 and HTTP/3 carriers
 
@@ -326,8 +326,8 @@ Recommended shape:
 
 - add `grpc` feature scaffolding
 - define gRPC call frontiers and call refs
-- update [`pd-edge/README.md`](../pd-edge/README.md) and
-  [`pd-edge/docs/full-dag.md`](../pd-edge/docs/full-dag.md) with gRPC attach and detach edges
+- update [`README.md`](../README.md) and
+  [`docs/full-dag.md`](../docs/full-dag.md) with gRPC attach and detach edges
 - add HTTP response trailer-write support
 - decide whether gRPC reuses HTTP exchange handle identity or introduces a distinct call handle
 - scaffold `edge/grpc/*` compile-time wrapper modules

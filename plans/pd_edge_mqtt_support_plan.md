@@ -48,16 +48,16 @@ Recommended conceptual layering:
 The runtime already has the right lower-level building blocks:
 
 - handle-based TCP and TLS transport DAGs live under
-  [`pd-edge/src/abi_impl/transport/`](../pd-edge/src/abi_impl/transport/)
+  [`src/abi_impl/transport/`](../src/abi_impl/transport/)
 - outbound WebSocket connections already exist under
-  [`pd-edge/src/abi_impl/websocket/`](../pd-edge/src/abi_impl/websocket/)
+  [`src/abi_impl/websocket/`](../src/abi_impl/websocket/)
 - raw connection hosting already exists in
-  [`pd-edge/src/runtime/transport_plane.rs`](../pd-edge/src/runtime/transport_plane.rs)
+  [`src/runtime/transport_plane.rs`](../src/runtime/transport_plane.rs)
 
 Important current constraints:
 
 - there is no `mqtt` namespace in [`pd-edge-abi/src/abi_spec/`](../pd-edge-abi/src/abi_spec/)
-- there is no `mqtt` implementation module under [`pd-edge/src/abi_impl/`](../pd-edge/src/abi_impl/)
+- there is no `mqtt` implementation module under [`src/abi_impl/`](../src/abi_impl/)
 - downstream WebSocket frame execution is still incomplete in the one-shot HTTP runtime, so
   downstream MQTT-over-WebSocket server hosting cannot be treated as already solved
 
@@ -193,7 +193,7 @@ MQTT becomes much more valuable once the runtime can host long-lived sessions.
 
 That should happen in the transport runtime, not in the one-shot HTTP request runtime:
 
-- `pd-edge/src/runtime/transport_plane.rs` already owns raw connection hosting
+- `src/runtime/transport_plane.rs` already owns raw connection hosting
 - MQTT can attach there without pretending to be HTTP
 - the VM runner can remain active while publish or subscribe events continue over one carrier
 
@@ -213,11 +213,11 @@ The runtime should not block outbound support on full broker-mode work.
 
 Recommended new modules:
 
-- `pd-edge/src/abi_impl/mqtt/mod.rs`
-- `pd-edge/src/abi_impl/mqtt/model.rs`
-- `pd-edge/src/abi_impl/mqtt/codec.rs`
-- `pd-edge/src/abi_impl/mqtt/upstream.rs`
-- `pd-edge/src/abi_impl/mqtt/downstream.rs`
+- `src/abi_impl/mqtt/mod.rs`
+- `src/abi_impl/mqtt/model.rs`
+- `src/abi_impl/mqtt/codec.rs`
+- `src/abi_impl/mqtt/upstream.rs`
+- `src/abi_impl/mqtt/downstream.rs`
 
 The target shape is:
 
@@ -253,8 +253,8 @@ Recommended runtime work:
 - add `mqtt` feature scaffolding
 - define MQTT session and delivery frontiers
 - add ABI symbols and no-op stubs
-- update [`pd-edge/README.md`](../pd-edge/README.md) and
-  [`pd-edge/docs/full-dag.md`](../pd-edge/docs/full-dag.md) with MQTT attach and detach edges
+- update [`README.md`](../README.md) and
+  [`docs/full-dag.md`](../docs/full-dag.md) with MQTT attach and detach edges
 
 ### Milestone 1: Outbound MQTT client over TCP and TLS
 

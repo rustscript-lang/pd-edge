@@ -1,6 +1,6 @@
 # HTTP Proxy Perf Methodology
 
-This note records the comparison rules for `pd-edge/examples/http_proxy_perf_framework.rs`.
+This note records the comparison rules for `examples/http_proxy_perf_framework.rs`.
 
 ## Baseline Rule
 
