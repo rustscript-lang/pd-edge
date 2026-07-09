@@ -12,7 +12,7 @@ separate costs in dependency order:
    full generic `Call` dispatch
 
 The intent is not to redesign ordinary RustScript function calls. Those are already compiled
-inline today in [`pd-vm/src/compiler/codegen.rs`](../pd-vm/src/compiler/codegen.rs), so the main
+inline today in [`rustscript/src/compiler/codegen.rs`](../rustscript/src/compiler/codegen.rs), so the main
 runtime tax is on builtin and host dispatch.
 
 ## Current Snapshot (2026-03-20 Baseline)
@@ -20,23 +20,23 @@ runtime tax is on builtin and host dispatch.
 Observed behavior in the current workspace:
 
 - heap VM values are shared through `Arc`:
-  [`SharedString`, `SharedBytes`, `SharedArray`, `SharedMap`](../pd-vm/src/bytecode.rs)
+  [`SharedString`, `SharedBytes`, `SharedArray`, `SharedMap`](../rustscript/src/bytecode.rs)
 - core hot builtins such as `len`, `slice`, `concat`, `get`, `has`, `set`, `keys`, and `count`
   already have manual borrowed or shared-handle fast paths in
-  [`pd-vm/src/builtins/runtime/core.rs`](../pd-vm/src/builtins/runtime/core.rs)
+  [`rustscript/src/builtins/runtime/core.rs`](../rustscript/src/builtins/runtime/core.rs)
 - proc-macro-generated builtin wrappers still extract arguments with
-  [`arg::<T>(args, index, label)`](../pd-vm/src/builtins/runtime/typed.rs), and
+  [`arg::<T>(args, index, label)`](../rustscript/src/builtins/runtime/typed.rs), and
   `VmArray`/`VmBytes`/`VmMap` extraction currently does `values.clone()` followed by
-  [`unwrap_or_clone_shared(...)`](../pd-vm/src/bytecode.rs), which guarantees a full payload clone
+  [`unwrap_or_clone_shared(...)`](../rustscript/src/bytecode.rs), which guarantees a full payload clone
   for read-only proc-macro builtin parameters
 - builtin calls already borrow the VM stack tail directly in
-  [`execute_builtin_call_from_stack`](../pd-vm/src/vm/host.rs)
+  [`execute_builtin_call_from_stack`](../rustscript/src/vm/host.rs)
 - VM-aware host calls still allocate a temporary `Vec<Value>` through
-  [`pop_call_args`](../pd-vm/src/vm/host.rs) before dispatching to
-  [`HostFunction::call`](../pd-vm/src/vm/host.rs)
+  [`pop_call_args`](../rustscript/src/vm/host.rs) before dispatching to
+  [`HostFunction::call`](../rustscript/src/vm/host.rs)
 - builtin and host return paths still use `Vec<Value>` through
-  [`BuiltinCallOutcome::Return(Vec<Value>)`](../pd-vm/src/builtins/runtime/mod.rs) and
-  [`CallOutcome::Return(Vec<Value>)`](../pd-vm/src/vm/host.rs)
+  [`BuiltinCallOutcome::Return(Vec<Value>)`](../rustscript/src/builtins/runtime/mod.rs) and
+  [`CallOutcome::Return(Vec<Value>)`](../rustscript/src/vm/host.rs)
 - JIT already recognizes specialized projection operations such as `string_len`, `bytes_len`,
   `string_get`, `bytes_get`, `array_len`, `array_get`, `array_has`, `map_len`, `map_get`, and
   `map_has`, but the interpreter still executes those through generic builtin `Call`
@@ -58,7 +58,7 @@ Current measured baselines from this workspace:
 Historical baseline note:
 
 - the missing steady-state host call latency benchmark called out here has since been added in
-  [`pd-vm/tests/jit/perf_tests.rs`](../pd-vm/tests/jit/perf_tests.rs)
+  [`rustscript/tests/jit/perf_tests.rs`](../rustscript/tests/jit/perf_tests.rs)
 
 ## Goals
 
@@ -177,7 +177,7 @@ Required new measurements:
 
 Suggested harness location:
 
-- [`pd-vm/tests/jit/perf_tests.rs`](../pd-vm/tests/jit/perf_tests.rs)
+- [`rustscript/tests/jit/perf_tests.rs`](../rustscript/tests/jit/perf_tests.rs)
 
 Suggested benchmark names:
 
@@ -198,9 +198,9 @@ Current surfaces:
 - proc-macro-generated VM-aware builtin wrapper
   - `fn wrapper(vm: &mut Vm, args: &[Value]) -> VmResult<T>`
   - arity: `2`
-- [`FromVmValue::from_vm_value(value, label)`](../pd-vm/src/builtins/runtime/typed.rs)
+- [`FromVmValue::from_vm_value(value, label)`](../rustscript/src/builtins/runtime/typed.rs)
   - arity: `2`
-- [`arg(args, index, label)`](../pd-vm/src/builtins/runtime/typed.rs)
+- [`arg(args, index, label)`](../rustscript/src/builtins/runtime/typed.rs)
   - arity: `3`
 
 Planned target surfaces:
@@ -247,22 +247,22 @@ Intent:
 
 Current type surfaces:
 
-- [`CallOutcome::Return(Vec<Value>)`](../pd-vm/src/vm/host.rs)
-- [`BuiltinCallOutcome::Return(Vec<Value>)`](../pd-vm/src/builtins/runtime/mod.rs)
+- [`CallOutcome::Return(Vec<Value>)`](../rustscript/src/vm/host.rs)
+- [`BuiltinCallOutcome::Return(Vec<Value>)`](../rustscript/src/builtins/runtime/mod.rs)
 
 Current function surfaces:
 
-- [`HostAsyncBridge::poll_op(op_id, cx)`](../pd-vm/src/vm/host.rs)
+- [`HostAsyncBridge::poll_op(op_id, cx)`](../rustscript/src/vm/host.rs)
   - arity: `2`
-- [`Vm::complete_host_op(op_id, values)`](../pd-vm/src/vm/host.rs)
+- [`Vm::complete_host_op(op_id, values)`](../rustscript/src/vm/host.rs)
   - arity: `2`
-- [`Vm::complete_waiting_host_op(op_id, values)`](../pd-vm/src/vm/host.rs)
+- [`Vm::complete_waiting_host_op(op_id, values)`](../rustscript/src/vm/host.rs)
   - arity: `2`
-- [`return_values(value)`](../pd-vm/src/builtins/runtime/typed.rs)
+- [`return_values(value)`](../rustscript/src/builtins/runtime/typed.rs)
   - arity: `1`
-- [`IntoBuiltinCallOutcome::into_builtin_call_outcome(self)`](../pd-vm/src/builtins/runtime/typed.rs)
+- [`IntoBuiltinCallOutcome::into_builtin_call_outcome(self)`](../rustscript/src/builtins/runtime/typed.rs)
   - arity: `0`
-- [`IntoHostCallOutcome::into_host_call_outcome(self)`](../pd-vm/src/builtins/runtime/typed.rs)
+- [`IntoHostCallOutcome::into_host_call_outcome(self)`](../rustscript/src/builtins/runtime/typed.rs)
   - arity: `0`
 
 Planned target surfaces:
@@ -306,25 +306,25 @@ Intent:
 
 Current public host ABI already has the right read-only argument shape:
 
-- [`HostFunction::call(vm, args)`](../pd-vm/src/vm/host.rs)
+- [`HostFunction::call(vm, args)`](../rustscript/src/vm/host.rs)
   - signature: `fn call(&mut self, vm: &mut Vm, args: &[Value]) -> VmResult<CallOutcome>`
   - arity: `2`
-- [`StaticHostFunction`](../pd-vm/src/vm/host.rs)
+- [`StaticHostFunction`](../rustscript/src/vm/host.rs)
   - signature: `fn(&mut Vm, &[Value]) -> VmResult<CallOutcome>`
   - arity: `2`
 
 Current args-only ABI:
 
-- [`HostArgsFunction::call(args)`](../pd-vm/src/vm/host.rs)
+- [`HostArgsFunction::call(args)`](../rustscript/src/vm/host.rs)
   - arity: `1`
-- [`StaticHostArgsFunction`](../pd-vm/src/vm/host.rs)
+- [`StaticHostArgsFunction`](../rustscript/src/vm/host.rs)
   - arity: `1`
 
 Current internal execution ABI that still allocates:
 
-- [`Vm::execute_bound_host_function(resolved_index, args, call_ip)`](../pd-vm/src/vm/host.rs)
+- [`Vm::execute_bound_host_function(resolved_index, args, call_ip)`](../rustscript/src/vm/host.rs)
   - arity: `3`
-- [`Vm::pop_call_args(argc)`](../pd-vm/src/vm/host.rs)
+- [`Vm::pop_call_args(argc)`](../rustscript/src/vm/host.rs)
   - arity: `1`
 
 Planned target:
@@ -376,10 +376,10 @@ No host trait ABI change is required for Stage 4.
 
 Stage 4 may change one of these internal execution interfaces:
 
-- interpreter fast path under [`OpCode::Call`](../pd-vm/src/vm/mod.rs)
-- bytecode opcode set in [`pd-vm/src/bytecode.rs`](../pd-vm/src/bytecode.rs), if dedicated
+- interpreter fast path under [`OpCode::Call`](../rustscript/src/vm/mod.rs)
+- bytecode opcode set in [`rustscript/src/bytecode.rs`](../rustscript/src/bytecode.rs), if dedicated
   opcodes are chosen instead of interpreter superinstructions
-- compiler lowering under [`pd-vm/src/compiler/codegen.rs`](../pd-vm/src/compiler/codegen.rs)
+- compiler lowering under [`rustscript/src/compiler/codegen.rs`](../rustscript/src/compiler/codegen.rs)
 - VMBC encode/decode if new opcodes are introduced
 
 Preferred first pass:
@@ -399,22 +399,22 @@ paths.
 
 ## Work Items
 
-1. Extend [`pd-vm/src/builtins/runtime/typed.rs`](../pd-vm/src/builtins/runtime/typed.rs) with
+1. Extend [`rustscript/src/builtins/runtime/typed.rs`](../rustscript/src/builtins/runtime/typed.rs) with
    borrowed and taken extractor traits.
-2. Teach [`pd-vm/pd-host-function/src/lib.rs`](../pd-vm/pd-host-function/src/lib.rs) to generate
+[`rustscript/pd-host-function/src/lib.rs`](../rustscript/pd-host-function/src/lib.rs)
    wrappers over `&mut [Value]` instead of `&[Value]`.
 3. Add borrowed argument wrapper types for strings, bytes, arrays, maps, and generic `Value`.
 4. Add taken/shared handle types for mutation-capable array/bytes/map inputs.
 5. Migrate read-only proc-macro builtins away from by-value heap extraction.
 6. Leave existing hand-written fast paths in
-   [`pd-vm/src/builtins/runtime/core.rs`](../pd-vm/src/builtins/runtime/core.rs) intact until the
+   [`rustscript/src/builtins/runtime/core.rs`](../rustscript/src/builtins/runtime/core.rs) intact until the
    new taken/shared-handle ABI can express them cleanly.
 
 ## First-Wave Migration Targets
 
-- [`bytes::from_array_u8`](../pd-vm/src/builtins/runtime/bytes.rs)
+- [`bytes::from_array_u8`](../rustscript/src/builtins/runtime/bytes.rs)
   - switch `values: VmArray` to borrowed array view
-- [`__format_template`](../pd-vm/src/builtins/runtime/core.rs)
+- [`__format_template`](../rustscript/src/builtins/runtime/core.rs)
   - switch `values: VmArray` to borrowed array view
 - any future proc-macro builtin that only reads bytes/array/map/string inputs
 
@@ -438,7 +438,7 @@ Remove the mandatory `Vec<Value>` allocation from the common 0-result and 1-resu
 2. Update builtin and host outcomes to return `CallReturn`.
 3. Update async host completion surfaces to return and complete `CallReturn`.
 4. Replace `return_values(...)` with `return_none()` and `return_one(...)`.
-5. Update the VM stack push sites in [`pd-vm/src/vm/host.rs`](../pd-vm/src/vm/host.rs) to consume
+5. Update the VM stack push sites in [`rustscript/src/vm/host.rs`](../rustscript/src/vm/host.rs) to consume
    `CallReturn` without heap allocation in the common case.
 
 ## Acceptance Criteria
@@ -457,12 +457,12 @@ borrowed argument slice.
 
 ## Work Items
 
-1. Change host dispatch in [`pd-vm/src/vm/host.rs`](../pd-vm/src/vm/host.rs) to borrow the stack
+1. Change host dispatch in [`rustscript/src/vm/host.rs`](../rustscript/src/vm/host.rs) to borrow the stack
    tail directly for ordinary `HostFunction` and `StaticHostFunction` calls.
 2. Preserve the current read-only host ABI so existing host implementations keep compiling.
 3. Keep yield and pending semantics correct when dispatch uses borrowed stack-tail slices.
 4. Migrate the default runtime host functions in
-   [`pd-vm/src/builtins/runtime/host.rs`](../pd-vm/src/builtins/runtime/host.rs) to the zero-alloc
+   [`rustscript/src/builtins/runtime/host.rs`](../rustscript/src/builtins/runtime/host.rs) to the zero-alloc
    dispatch path.
 
 ## Notes
@@ -539,20 +539,20 @@ Reason for this order:
 
 ## Files Likely To Change
 
-- [`pd-vm/pd-host-function/src/lib.rs`](../pd-vm/pd-host-function/src/lib.rs)
-- [`pd-vm/src/builtins/runtime/typed.rs`](../pd-vm/src/builtins/runtime/typed.rs)
-- [`pd-vm/src/builtins/runtime/mod.rs`](../pd-vm/src/builtins/runtime/mod.rs)
-- [`pd-vm/src/builtins/runtime/core.rs`](../pd-vm/src/builtins/runtime/core.rs)
-- [`pd-vm/src/builtins/runtime/bytes.rs`](../pd-vm/src/builtins/runtime/bytes.rs)
-- [`pd-vm/src/builtins/runtime/host.rs`](../pd-vm/src/builtins/runtime/host.rs)
-- [`pd-vm/src/vm/host.rs`](../pd-vm/src/vm/host.rs)
-- [`pd-vm/src/vm/mod.rs`](../pd-vm/src/vm/mod.rs)
-- [`pd-vm/src/compiler/codegen.rs`](../pd-vm/src/compiler/codegen.rs)
-- [`pd-vm/src/assembler.rs`](../pd-vm/src/assembler.rs)
-- [`pd-vm/src/bytecode.rs`](../pd-vm/src/bytecode.rs)
-- [`pd-vm/src/vmbc.rs`](../pd-vm/src/vmbc.rs), if new opcodes are introduced
-- [`pd-vm/src/vm/jit/recorder.rs`](../pd-vm/src/vm/jit/recorder.rs)
-- [`pd-vm/src/vm/aot/ir.rs`](../pd-vm/src/vm/aot/ir.rs)
-- [`pd-vm/src/vm/aot/ssa.rs`](../pd-vm/src/vm/aot/ssa.rs)
-- [`pd-vm/src/vm/aot/compile.rs`](../pd-vm/src/vm/aot/compile.rs), only if Stage 4 needs parity
-- [`pd-vm/tests/jit/perf_tests.rs`](../pd-vm/tests/jit/perf_tests.rs)
+[`rustscript/pd-host-function/src/lib.rs`](../rustscript/pd-host-function/src/lib.rs)
+- [`rustscript/src/builtins/runtime/typed.rs`](../rustscript/src/builtins/runtime/typed.rs)
+- [`rustscript/src/builtins/runtime/mod.rs`](../rustscript/src/builtins/runtime/mod.rs)
+- [`rustscript/src/builtins/runtime/core.rs`](../rustscript/src/builtins/runtime/core.rs)
+- [`rustscript/src/builtins/runtime/bytes.rs`](../rustscript/src/builtins/runtime/bytes.rs)
+- [`rustscript/src/builtins/runtime/host.rs`](../rustscript/src/builtins/runtime/host.rs)
+- [`rustscript/src/vm/host.rs`](../rustscript/src/vm/host.rs)
+- [`rustscript/src/vm/mod.rs`](../rustscript/src/vm/mod.rs)
+- [`rustscript/src/compiler/codegen.rs`](../rustscript/src/compiler/codegen.rs)
+- [`rustscript/src/assembler.rs`](../rustscript/src/assembler.rs)
+- [`rustscript/src/bytecode.rs`](../rustscript/src/bytecode.rs)
+- [`rustscript/src/vmbc.rs`](../rustscript/src/vmbc.rs), if new opcodes are introduced
+- [`rustscript/src/vm/jit/recorder.rs`](../rustscript/src/vm/jit/recorder.rs)
+- [`rustscript/src/vm/aot/ir.rs`](../rustscript/src/vm/aot/ir.rs)
+- [`rustscript/src/vm/aot/ssa.rs`](../rustscript/src/vm/aot/ssa.rs)
+- [`rustscript/src/vm/aot/compile.rs`](../rustscript/src/vm/aot/compile.rs), only if Stage 4 needs parity
+- [`rustscript/tests/jit/perf_tests.rs`](../rustscript/tests/jit/perf_tests.rs)

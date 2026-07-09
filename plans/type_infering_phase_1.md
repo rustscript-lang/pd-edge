@@ -16,12 +16,12 @@ Reduce dynamic dispatch and type ambiguity across the compiler, interpreter, tra
 
 ### Scope
 
-- Add `TypeMap` to [pd-vm/src/bytecode.rs](pd-vm/src/bytecode.rs).
-- Record inferred operand types at emitted bytecode offsets in [pd-vm/src/compiler/mod.rs](pd-vm/src/compiler/mod.rs).
+- Add `TypeMap` to [rustscript/src/bytecode.rs](pd-vm/src/bytecode.rs).
+- Record inferred operand types at emitted bytecode offsets in [rustscript/src/compiler/mod.rs](pd-vm/src/compiler/mod.rs).
 - Keep local-slot type summaries for debug/runtime consumers, but treat them as lossy slot history rather than source binding truth.
-- Persist `Program.type_map` through VMBC in [pd-vm/src/vmbc.rs](pd-vm/src/vmbc.rs).
-- Persist the richer trace/AOT shape through [pd-vm/src/vm/jit/aot.rs](pd-vm/src/vm/jit/aot.rs).
-- Extend host import metadata to carry explicit return types in [pd-vm/src/bytecode.rs](pd-vm/src/bytecode.rs).
+- Persist `Program.type_map` through VMBC in [rustscript/src/vmbc.rs](pd-vm/src/vmbc.rs).
+- Persist the richer trace/AOT shape through [rustscript/src/vm/jit/aot.rs](pd-vm/src/vm/jit/aot.rs).
+- Extend host import metadata to carry explicit return types in [rustscript/src/bytecode.rs](pd-vm/src/bytecode.rs).
 
 ### Deliverables
 
@@ -40,19 +40,19 @@ Reduce dynamic dispatch and type ambiguity across the compiler, interpreter, tra
 
 ## Verification 1
 
-- [pd-vm/tests/wire_tests.rs](pd-vm/tests/wire_tests.rs): round-trip `Program.type_map`
-- [pd-vm/tests/compiler/type_inference_tests.rs](pd-vm/tests/compiler/type_inference_tests.rs): compiler attaches known operand types to emitted bytecode
-- [pd-vm/tests/compiler/compiler_common_tests.rs](pd-vm/tests/compiler/compiler_common_tests.rs): compile/runtime sanity remains intact with the new metadata attached
+- [rustscript/tests/wire_tests.rs](pd-vm/tests/wire_tests.rs): round-trip `Program.type_map`
+- [rustscript/tests/compiler/type_inference_tests.rs](pd-vm/tests/compiler/type_inference_tests.rs): compiler attaches known operand types to emitted bytecode
+- [rustscript/tests/compiler/compiler_common_tests.rs](pd-vm/tests/compiler/compiler_common_tests.rs): compile/runtime sanity remains intact with the new metadata attached
 
 ## Phase 2: Use Metadata in the Interpreter and Trace JIT
 
 ### Scope
 
-- Teach the interpreter in [pd-vm/src/vm/mod.rs](pd-vm/src/vm/mod.rs) to consume operand metadata for monomorphic fast paths.
+- Teach the interpreter in [rustscript/src/vm/mod.rs](pd-vm/src/vm/mod.rs) to consume operand metadata for monomorphic fast paths.
 - Avoid hot-path `HashMap` lookups by materializing a dense packed hint table once per VM.
-- Teach the trace recorder in [pd-vm/src/vm/jit/trace.rs](pd-vm/src/vm/jit/trace.rs) to emit typed trace steps instead of falling back to generic arithmetic where types are known.
-- Execute the typed steps in [pd-vm/src/vm/jit/runtime.rs](pd-vm/src/vm/jit/runtime.rs).
-- Inline typed native lowering in [pd-vm/src/vm/jit/native/codegen.rs](pd-vm/src/vm/jit/native/codegen.rs), including float arithmetic and float comparisons/equality.
+- Teach the trace recorder in [rustscript/src/vm/jit/trace.rs](pd-vm/src/vm/jit/trace.rs) to emit typed trace steps instead of falling back to generic arithmetic where types are known.
+- Execute the typed steps in [rustscript/src/vm/jit/runtime.rs](pd-vm/src/vm/jit/runtime.rs).
+- Inline typed native lowering in [rustscript/src/vm/jit/native/codegen.rs](pd-vm/src/vm/jit/native/codegen.rs), including float arithmetic and float comparisons/equality.
 
 ### Deliverables
 
@@ -73,10 +73,10 @@ Reduce dynamic dispatch and type ambiguity across the compiler, interpreter, tra
 
 ## Verification 2
 
-- [pd-vm/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed int/float/string trace-step coverage
-- [pd-vm/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed float math lowers natively without helper-bridge hits
-- [pd-vm/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed float compare/equality lowers natively without helper-bridge hits
-- [pd-vm/tests/jit/perf_tests.rs](pd-vm/tests/jit/perf_tests.rs): `perf_jit_native_reduces_tight_loop_latency`
+- [rustscript/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed int/float/string trace-step coverage
+- [rustscript/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed float math lowers natively without helper-bridge hits
+- [rustscript/tests/jit_tests.rs](pd-vm/tests/jit_tests.rs): typed float compare/equality lowers natively without helper-bridge hits
+- [rustscript/tests/jit/perf_tests.rs](pd-vm/tests/jit/perf_tests.rs): `perf_jit_native_reduces_tight_loop_latency`
 
 ## Phase 3: Improve Inference Quality and Reject Known-Bad Programs Earlier
 
@@ -114,7 +114,7 @@ Reduce dynamic dispatch and type ambiguity across the compiler, interpreter, tra
 
 ## Verification 3
 
-- [pd-vm/tests/compiler/type_inference_tests.rs](pd-vm/tests/compiler/type_inference_tests.rs):
+- [rustscript/tests/compiler/type_inference_tests.rs](pd-vm/tests/compiler/type_inference_tests.rs):
   - callable return propagation through functions and closures
   - `"text" + 123` string-concat inference
   - loop stability for `for`/`while`
@@ -123,11 +123,11 @@ Reduce dynamic dispatch and type ambiguity across the compiler, interpreter, tra
   - homogeneous container `get` inference
   - explicit host return-type propagation
   - generated builtin/namespace return-type propagation
-- [pd-vm/tests/compiler/compiler_common_tests.rs](pd-vm/tests/compiler/compiler_common_tests.rs):
+- [rustscript/tests/compiler/compiler_common_tests.rs](pd-vm/tests/compiler/compiler_common_tests.rs):
   - data-driven `if/else` mismatch rejection cases
   - shadowed outer-local mismatch cases
   - loop-carried shadowed mismatch cases
-- [pd-vm/tests/compiler/diagnostics_tests.rs](pd-vm/tests/compiler/diagnostics_tests.rs): rendered compile diagnostics for `if/else` mismatches
+- [rustscript/tests/compiler/diagnostics_tests.rs](pd-vm/tests/compiler/diagnostics_tests.rs): rendered compile diagnostics for `if/else` mismatches
 - [pd-vm/pd-vm-lint-wasm/src/lib.rs](pd-vm/pd-vm-lint-wasm/src/lib.rs): structured wasm diagnostic coverage
 - [pd-vm/pd-vm-runtime-wasm/src/lib.rs](pd-vm/pd-vm-runtime-wasm/src/lib.rs): structured wasm runtime-analyzer coverage
 
@@ -141,7 +141,7 @@ If frontend/editor changes are required to surface the new compiler behavior:
 
 Implementation landed in:
 
-- [pd-vm/src/compiler/diagnostics.rs](pd-vm/src/compiler/diagnostics.rs)
+- [rustscript/src/compiler/diagnostics.rs](pd-vm/src/compiler/diagnostics.rs)
 - [pd-vm/pd-vm-lint-wasm/src/analyzer.rs](pd-vm/pd-vm-lint-wasm/src/analyzer.rs)
 - [pd-vm/pd-vm-runtime-wasm/src/analyzer.rs](pd-vm/pd-vm-runtime-wasm/src/analyzer.rs)
 - [pd-controller/webui/src/app/monaco/lintMarkers.ts](pd-controller/webui/src/app/monaco/lintMarkers.ts)

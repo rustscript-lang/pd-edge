@@ -8,6 +8,7 @@
 *.pat
 *.txt
 *.json
+!pd-edge-abi/abi.json
 *.vsix
 node_modules
 dist

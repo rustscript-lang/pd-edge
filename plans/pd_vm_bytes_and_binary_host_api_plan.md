@@ -68,7 +68,7 @@ forcing protocol code into the wrong abstraction.
 - Keep `bytes` distinct from `string` and `array`.
 - Extend core language operations so `bytes` behaves like a first-class sequence where that is
   semantically correct.
-- Add a shared [`pd-vm/stdlib/rss/bytes.rss`](../pd-vm/stdlib/rss/) module with ergonomic helpers
+- Add a shared [`rustscript/stdlib/rss/bytes.rss`](../rustscript/stdlib/rss/) module with ergonomic helpers
   for byte-sequence work.
 - Add native builtin conversions for UTF-8, hex, and base64 so RSS programs do not reimplement
   codecs in script.
@@ -89,7 +89,7 @@ forcing protocol code into the wrong abstraction.
 ## Historical State Before Bytes Landed
 
 The current VM value model only has `Null`, `Int`, `Float`, `Bool`, `String`, `Array`, and `Map`
-in [`pd-vm/src/bytecode.rs`](../pd-vm/src/bytecode.rs).
+in [`rustscript/src/bytecode.rs`](../rustscript/src/bytecode.rs).
 
 Important current consequences:
 
@@ -97,11 +97,11 @@ Important current consequences:
 - the edge ABI only knows `Unknown`, `Null`, `Int`, `Float`, `Bool`, `String`, `Array`, and `Map`
   in [`pd-edge-abi/src/lib.rs`](../pd-edge-abi/src/lib.rs)
 - generic string operations are Unicode-character oriented rather than byte oriented:
-  [`len`](../pd-vm/src/builtins/runtime/core.rs),
-  [`slice`](../pd-vm/src/builtins/runtime/core.rs), and
-  [`get`](../pd-vm/src/builtins/runtime/core.rs) all operate on `chars()`
+  [`len`](../rustscript/src/builtins/runtime/core.rs),
+  [`slice`](../rustscript/src/builtins/runtime/core.rs), and
+  [`get`](../rustscript/src/builtins/runtime/core.rs) all operate on `chars()`
 - shared RSS stdlib modules exist for strings and collections under
-  [`pd-vm/stdlib/rss/`](../pd-vm/stdlib/rss/), but there is no `bytes.rss`
+  [`rustscript/stdlib/rss/`](../rustscript/stdlib/rss/), but there is no `bytes.rss`
 - lint, inferred-type, and completion surfaces therefore have no way to report `bytes` as a
   distinct language type today
 
@@ -153,7 +153,7 @@ Important rule:
 
 ### 2. Extend the core language runtime to understand `bytes`
 
-The generic core builtins in [`pd-vm/src/builtins/runtime/core.rs`](../pd-vm/src/builtins/runtime/core.rs)
+The generic core builtins in [`rustscript/src/builtins/runtime/core.rs`](../rustscript/src/builtins/runtime/core.rs)
 should treat `bytes` as a first-class sequence alongside strings and arrays where appropriate.
 
 Recommended behavior:
@@ -204,7 +204,7 @@ code during migration.
 
 ### 4. Add `bytes.rss` as the ergonomic RSS layer
 
-Add [`pd-vm/stdlib/rss/bytes.rss`](../pd-vm/stdlib/rss/) as the shared high-level helper module.
+Add [`rustscript/stdlib/rss/bytes.rss`](../rustscript/stdlib/rss/) as the shared high-level helper module.
 
 Its public API should include:
 
@@ -298,9 +298,9 @@ Recommended non-rule:
 Required work in `pd-vm`:
 
 - add `Value::Bytes` and `ValueType::Bytes` in
-  [`pd-vm/src/bytecode.rs`](../pd-vm/src/bytecode.rs)
+  [`rustscript/src/bytecode.rs`](../rustscript/src/bytecode.rs)
 - add `SharedBytes` storage and structural equality or hashing support
-- extend VMBC encode or decode support in [`pd-vm/src/vmbc.rs`](../pd-vm/src/vmbc.rs)
+- extend VMBC encode or decode support in [`rustscript/src/vmbc.rs`](../rustscript/src/vmbc.rs)
 - bump the VMBC wire version as needed once a new constant encoding tag is introduced
 - audit native JIT layout helpers and value-tag handling so `Bytes` is a legal runtime value even
   when typed byte fast paths are not added immediately
@@ -326,13 +326,13 @@ Required compiler work:
 
 Required end-to-end tooling work:
 
-- extend lint entrypoints in [`pd-vm/src/compiler/pipeline.rs`](../pd-vm/src/compiler/pipeline.rs)
+- extend lint entrypoints in [`rustscript/src/compiler/pipeline.rs`](../rustscript/src/compiler/pipeline.rs)
   so inferred `bytes` locals and annotations are preserved correctly
 - extend typing validation and diagnostic sites under
-  [`pd-vm/src/compiler/typing/`](../pd-vm/src/compiler/typing/)
+  [`rustscript/src/compiler/typing/`](../rustscript/src/compiler/typing/)
 - extend completion and hover metadata emitted to the wasm playground and web UI under
-  [`pd-vm/pd-vm-wasm/src/`](../pd-vm/pd-vm-wasm/src/) and
-  [`pd-vm/webui/src/`](../pd-vm/webui/src/)
+  [`pd-vm-wasm/src/`](../pd-vm-wasm/src/) and
+  [`playground/src/`](../playground/src/)
 
 Optional later work:
 
@@ -364,7 +364,7 @@ Required ABI work:
 - add a `Bytes` callable marker alongside `Any`, `Array`, `Map`, and `Value`
 - regenerate ABI manifests and generated tables
 - update the compiler mapping in
-  [`pd-vm/src/compiler/parser/symbols.rs`](../pd-vm/src/compiler/parser/symbols.rs)
+  [`rustscript/src/compiler/parser/symbols.rs`](../rustscript/src/compiler/parser/symbols.rs)
 
 Then update host ABI declarations so binary paths use native `Bytes`.
 
@@ -387,8 +387,8 @@ Recommended implementation detail:
 
 Required shared-library work:
 
-- add [`pd-vm/stdlib/rss/bytes.rss`](../pd-vm/stdlib/rss/)
-- add [`pd-vm/stdlib/tests/bytes.rss`](../pd-vm/stdlib/tests/)
+- add [`rustscript/stdlib/rss/bytes.rss`](../rustscript/stdlib/rss/)
+- add [`rustscript/stdlib/tests/bytes.rss`](../rustscript/stdlib/tests/)
 - add docs or examples showing UTF-8, hex, base64, and u16 parsing
 
 Because `pd-edge` reuses the shared VM stdlib, this module should live in `pd-vm`, not only in the
