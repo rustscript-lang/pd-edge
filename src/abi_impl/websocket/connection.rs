@@ -612,6 +612,7 @@ fn pick_downstream_subprotocol(request: &WsRequest, configured: &[String]) -> Op
         })
 }
 
+#[allow(clippy::result_large_err)]
 async fn accept_downstream_websocket(
     context: &SharedProxyVmContext,
 ) -> Result<(SharedWebSocketIo, Option<String>), VmError> {

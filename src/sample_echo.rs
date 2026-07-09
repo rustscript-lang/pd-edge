@@ -1559,6 +1559,7 @@ fn generate_http3_quic_server_config_from_identity(
 }
 
 #[cfg(feature = "websocket")]
+#[allow(clippy::result_large_err)]
 async fn run_websocket_echo_session<S>(
     stream: S,
 ) -> Result<(), tokio_tungstenite::tungstenite::Error>

@@ -384,6 +384,7 @@ pub(crate) async fn spawn_sse_upstream(lines: Vec<&'static str>) -> (SocketAddr,
 }
 
 #[cfg(feature = "websocket")]
+#[allow(clippy::result_large_err)]
 pub(crate) async fn spawn_websocket_echo_upstream_on(
     bind_addr: SocketAddr,
 ) -> (SocketAddr, JoinHandle<()>) {

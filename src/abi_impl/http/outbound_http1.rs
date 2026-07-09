@@ -1402,7 +1402,7 @@ where
     .await
     {
         Ok(parsed) => parsed,
-        Err(err) if request_retryable => {
+        Err(_err) if request_retryable => {
             note_http1_pool_connection_dropped_dirty();
             retries = 1;
             send_us = u64::try_from(send_started.elapsed().as_micros()).unwrap_or(u64::MAX);
@@ -1540,7 +1540,7 @@ where
             .await
         {
             Ok(parsed) => parsed,
-            Err(err) if request_retryable => {
+            Err(_err) if request_retryable => {
                 note_http1_pool_connection_dropped_dirty();
                 retries = 1;
                 send_us = u64::try_from(send_started.elapsed().as_micros()).unwrap_or(u64::MAX);
