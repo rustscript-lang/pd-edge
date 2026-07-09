@@ -31,8 +31,8 @@ use super::super::websocket::{
 use super::state::tls_session_cache_key;
 use super::state::{
     CachedDownstreamTlsConfiguration, DownstreamTlsResumptionState, DownstreamTlsServerStart,
-    ReplayPrefixedIo, TlsFlowState, TlsProtocolVersion, TlsSessionRef,
-    decode_tls_session_handle, downstream_tls_configuration_key, downstream_tls_resumption_key,
+    ReplayPrefixedIo, TlsFlowState, TlsProtocolVersion, TlsSessionRef, decode_tls_session_handle,
+    downstream_tls_configuration_key, downstream_tls_resumption_key,
 };
 use crate::abi_impl::transport::HTTP11_ALPN_PROTOCOL;
 use crate::lock_metrics::LockMetricKey;
@@ -621,7 +621,10 @@ fn cached_downstream_configuration(
     start: &DownstreamTlsServerStart,
 ) -> Option<CachedDownstreamTlsConfiguration> {
     let cache = context.services().downstream_tls_configuration_cache()?;
-    let key = downstream_tls_configuration_key(start.client_hello_server_name(), start.client_hello_alpn());
+    let key = downstream_tls_configuration_key(
+        start.client_hello_server_name(),
+        start.client_hello_alpn(),
+    );
     cache.peek_cloned(
         &key,
         LockMetricKey::TlsSessionCache,

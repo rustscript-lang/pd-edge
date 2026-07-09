@@ -1438,6 +1438,8 @@ fn normalize_authority_host(value: &str) -> Option<String> {
 mod tests {
     use axum::http::Version;
 
+    #[cfg(feature = "tls")]
+    use super::CachedDownstreamTlsConfiguration;
     use super::{
         CachedTlsSession, TCP_STREAM_DEFAULT_UPSTREAM, TCP_STREAM_DOWNSTREAM, TcpFlowState,
         TlsFlowState, TlsHandshakePhase, TlsProtocolVersion, TlsSessionPath, TlsTransportDag,
@@ -1445,8 +1447,6 @@ mod tests {
         alpn_from_http_version, decode_tcp_stream_handle, decode_tls_session_handle,
         decode_udp_socket_handle, tls_session_cache_key,
     };
-    #[cfg(feature = "tls")]
-    use super::CachedDownstreamTlsConfiguration;
 
     #[test]
     fn reserved_socket_handles_decode_to_default_streams_and_sessions() {

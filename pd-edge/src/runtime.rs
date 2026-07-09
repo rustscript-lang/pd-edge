@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
 use vm::{Program, decode_program, validate_program};
 
+#[cfg(feature = "tls")]
+use crate::abi_impl::{
+    new_shared_downstream_tls_configuration_cache, new_shared_downstream_tls_resumption_cache,
+};
 use crate::{
     HOST_FUNCTION_COUNT,
     abi_impl::{
@@ -38,10 +42,6 @@ use crate::{
     debug_session::{SharedDebugSession, debug_session_status, new_debug_session_store},
     lock_metrics::{self, LockMetricSnapshot},
     logging::category_program,
-};
-#[cfg(feature = "tls")]
-use crate::abi_impl::{
-    new_shared_downstream_tls_configuration_cache, new_shared_downstream_tls_resumption_cache,
 };
 
 mod http_plane;
