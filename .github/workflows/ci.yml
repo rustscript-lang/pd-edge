@@ -34,7 +34,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features
       - name: Tests
         working-directory: pd-edge
-        run: cargo test --workspace --jobs 4
+        run: cargo test --workspace
 
   binaries:
     name: pd-edge binaries (${{ matrix.os }})
