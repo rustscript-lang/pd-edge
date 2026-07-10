@@ -2,6 +2,8 @@
 name = "pd-edge-abi"
 version.workspace = true
 edition.workspace = true
+description = "ABI definitions for RustScript edge host functions"
+license = "MIT"
 build = "build.rs"
 
 [lib]
@@ -18,7 +20,7 @@ websocket = ["http"]
 webrtc = ["http"]
 
 [dependencies]
-pd-host-function = { path = "../../rustscript/pd-host-function" }
+pd-host-function = { path = "../../rustscript/pd-host-function", version = "0.1.0" }
 
 [build-dependencies]
 syn = { version = "2", features = ["full"] }

@@ -2,6 +2,8 @@
 name = "pd-edge-host-function"
 version.workspace = true
 edition.workspace = true
+description = "Proc macro support for RustScript edge host functions"
+license = "MIT"
 
 [lib]
 proc-macro = true
