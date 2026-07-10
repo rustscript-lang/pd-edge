@@ -8,7 +8,7 @@ use http;
 use runtime;
 use tls;
 
-let argc = console::args::count();
+let argc: int = console::args::count();
 
 if argc == 0 {
     console::stderr::write("usage: <host> [method] [body|-] [verify=true|false]\n");
@@ -16,30 +16,34 @@ if argc == 0 {
     console::stderr::flush();
     runtime::exit();
 } else {
-    let host = console::args::get(0);
+    let host: string = console::args::get(0);
     let port = 4443;
     if host == "" {
         console::stderr::write("host is required\n");
         console::stderr::flush();
         runtime::exit();
     }
-    let method = if argc > 1 => {
-        console::args::get(1)
+    let method: string = if argc > 1 => {
+        let value: string = console::args::get(1);
+        value
     } else => {
         "GET"
     };
-    let body_arg = if argc > 2 => {
-        console::args::get(2)
+    let body_arg: string = if argc > 2 => {
+        let value: string = console::args::get(2);
+        value
     } else => {
         ""
     };
-    let body = if body_arg == "-" => {
-        console::stdin::read_all()
+    let body: string = if body_arg == "-" => {
+        let value: string = console::stdin::read_all();
+        value
     } else => {
         body_arg
     };
-    let verify_arg = if argc > 3 => {
-        console::args::get(3)
+    let verify_arg: string = if argc > 3 => {
+        let value: string = console::args::get(3);
+        value
     } else => {
         "true"
     };

@@ -108,7 +108,7 @@ fn compile_edge_source_file_supports_console_namespace_host_import() {
         &main_path,
         r#"
         use console;
-        let arg0 = console::args::get(0);
+        let arg0: string = console::args::get(0);
         console::args::count() + arg0.length + console::stdout::write("ok");
     "#,
     )

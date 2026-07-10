@@ -1013,9 +1013,9 @@ mod tests {
             r#"
             use console;
 
-            let arg0 = console::args::get(0);
-            let arg1 = console::args::get(1);
-            let arg2 = console::args::get(2);
+            let arg0: string = console::args::get(0);
+            let arg1: string = console::args::get(1);
+            let arg2: string = console::args::get(2);
 
             console::args::count() + arg0.length + arg1.length + arg2.length;
         "#,
