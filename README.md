@@ -24,8 +24,8 @@ pd-edge = { git = "https://github.com/rustscript-lang/pd-edge", package = "pd-ed
 ## Test
 
 ```bash
-cargo test --workspace --jobs 4
-cargo build --workspace --release --jobs 4
+cargo test --workspace 
+cargo build --workspace --release 
 ```
 
 ## Runtime guide
