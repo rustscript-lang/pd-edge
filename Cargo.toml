@@ -16,6 +16,8 @@ version.workspace = true
 edition.workspace = true
 description = "RustScript edge runtime and proxy host integration"
 license = "MIT"
+homepage = "https://rustscript.org/"
+repository = "https://github.com/rustscript-lang/pd-edge"
 build = "build.rs"
 autobins = false
 
