@@ -1,8 +1,6 @@
 # pd-edge
 
 [![pd-edge on crates.io](https://img.shields.io/crates/v/pd-edge.svg)](https://crates.io/crates/pd-edge)
-[![pd-edge-abi on crates.io](https://img.shields.io/crates/v/pd-edge-abi.svg)](https://crates.io/crates/pd-edge-abi)
-[![pd-edge-host-function on crates.io](https://img.shields.io/crates/v/pd-edge-host-function.svg)](https://crates.io/crates/pd-edge-host-function)
 
 `pd-edge` is the edge data-plane runtime plus the edge ABI for running VM programs at the edge.
 
