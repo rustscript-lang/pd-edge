@@ -7,7 +7,7 @@
 ## Related projects
 
 - RustScript core VM and standard library: https://github.com/rustscript-lang/rustscript
-- CLR VM: https://github.com/rustscript-lang/rustscript-clr-vm
+- IronRust: https://github.com/rustscript-lang/IronRust
 - Edge runtime and ABI: https://github.com/rustscript-lang/pd-edge
 - Controller: https://github.com/rustscript-lang/pd-controller
 
