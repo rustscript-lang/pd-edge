@@ -4,13 +4,6 @@
 
 `pd-edge` is the edge data-plane runtime plus the edge ABI for running VM programs at the edge.
 
-## Related projects
-
-- RustScript core VM and standard library: https://github.com/rustscript-lang/rustscript
-- IronRust: https://github.com/rustscript-lang/IronRust
-- Edge runtime and ABI: https://github.com/rustscript-lang/pd-edge
-- Controller: https://github.com/rustscript-lang/pd-controller
-
 ## Cargo usage
 
 The workspace uses sibling RustScript crates during local development. For downstream Cargo manifests, use these repository references:
