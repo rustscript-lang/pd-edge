@@ -256,7 +256,7 @@ and HTTP runtime.
 - define generic DNS query frontiers
 - add ABI symbols and stubs
 - update [`README.md`](../README.md) and
-  [`docs/full-dag.md`](../docs/full-dag.md) with DNS attach and detach edges
+  [`Full DAG graphs`](https://rustscript.org/docs/reference/pd-edge/full-dag/) with DNS attach and detach edges
 
 ### Milestone 1: Upstream raw DNS over UDP and TCP
 

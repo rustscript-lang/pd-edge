@@ -335,7 +335,7 @@ Recommended new modules under [src/abi_impl/](src/abi_impl/):
 This should be accompanied by documentation updates in:
 
 - [README.md](README.md)
-- [docs/full-dag.md](docs/full-dag.md)
+- [Full DAG graphs](https://rustscript.org/docs/reference/pd-edge/full-dag/)
 
 ## Downstream And Upstream Strategy
 

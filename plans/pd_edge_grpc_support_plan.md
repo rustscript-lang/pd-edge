@@ -327,7 +327,7 @@ Recommended shape:
 - add `grpc` feature scaffolding
 - define gRPC call frontiers and call refs
 - update [`README.md`](../README.md) and
-  [`docs/full-dag.md`](../docs/full-dag.md) with gRPC attach and detach edges
+  [`Full DAG graphs`](https://rustscript.org/docs/reference/pd-edge/full-dag/) with gRPC attach and detach edges
 - add HTTP response trailer-write support
 - decide whether gRPC reuses HTTP exchange handle identity or introduces a distinct call handle
 - scaffold `edge/grpc/*` compile-time wrapper modules

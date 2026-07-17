@@ -254,7 +254,7 @@ Recommended runtime work:
 - define MQTT session and delivery frontiers
 - add ABI symbols and no-op stubs
 - update [`README.md`](../README.md) and
-  [`docs/full-dag.md`](../docs/full-dag.md) with MQTT attach and detach edges
+  [`Full DAG graphs`](https://rustscript.org/docs/reference/pd-edge/full-dag/) with MQTT attach and detach edges
 
 ### Milestone 1: Outbound MQTT client over TCP and TLS
 

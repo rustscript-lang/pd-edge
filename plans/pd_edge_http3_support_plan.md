@@ -34,7 +34,7 @@ That gives the properties this effort needs:
 - Add shared upstream HTTP/3 session reuse and stream multiplexing.
 - Track downstream HTTP/3 sessions and request streams outside per-request `ProxyVmContext`, the same way HTTP/2 now does.
 - Make carrier attachment explicit in generic exchange state so HTTP/1.1, HTTP/2, and HTTP/3 are sibling realizations.
-- Keep the design aligned with the layered DAG model in [README.md](../README.md) and [docs/full-dag.md](../docs/full-dag.md).
+- Keep the design aligned with the layered DAG model in [README.md](../README.md) and [Full DAG graphs](https://rustscript.org/docs/reference/pd-edge/full-dag/).
 
 ## Non-Goals For The First Milestone
 
