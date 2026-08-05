@@ -1,4 +1,4 @@
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 use vm::{CallOutcome, Value, Vm, VmError};
 
@@ -240,7 +240,7 @@ fn write_io_target(
 }
 
 /// Opens a file handle for runtime I/O.
-#[pd_edge_host_function(name = "io::open", scope = io)]
+#[pd_host_function(name = "io::open", scope = io)]
 async fn io_open(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -278,7 +278,7 @@ async fn io_open(
 }
 
 /// Starts a child process and returns a process-backed handle.
-#[pd_edge_host_function(name = "io::popen", scope = io)]
+#[pd_host_function(name = "io::popen", scope = io)]
 async fn io_popen(_vm: &mut Vm, _command: String, _mode: String) -> Result<CallOutcome, VmError> {
     Err(VmError::HostError(
         "io::popen is disabled in edge runtime; use protocol-specific async host APIs".to_string(),
@@ -286,7 +286,7 @@ async fn io_popen(_vm: &mut Vm, _command: String, _mode: String) -> Result<CallO
 }
 
 /// Reads all remaining text from an I/O handle.
-#[pd_edge_host_function(name = "io::read_all", scope = io)]
+#[pd_host_function(name = "io::read_all", scope = io)]
 async fn io_read_all(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -303,7 +303,7 @@ async fn io_read_all(
 }
 
 /// Reads a single line of text from an I/O handle.
-#[pd_edge_host_function(name = "io::read_line", scope = io)]
+#[pd_host_function(name = "io::read_line", scope = io)]
 async fn io_read_line(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -320,7 +320,7 @@ async fn io_read_line(
 }
 
 /// Writes text to an I/O handle.
-#[pd_edge_host_function(name = "io::write", scope = io)]
+#[pd_host_function(name = "io::write", scope = io)]
 async fn io_write(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -340,7 +340,7 @@ async fn io_write(
 }
 
 /// Flushes buffered output for an I/O handle.
-#[pd_edge_host_function(name = "io::flush", scope = io)]
+#[pd_host_function(name = "io::flush", scope = io)]
 async fn io_flush(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -362,7 +362,7 @@ async fn io_flush(
 }
 
 /// Closes an I/O handle.
-#[pd_edge_host_function(name = "io::close", scope = io)]
+#[pd_host_function(name = "io::close", scope = io)]
 async fn io_close(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -384,7 +384,7 @@ async fn io_close(
 }
 
 /// Returns whether a file system path exists.
-#[pd_edge_host_function(name = "io::exists", scope = io)]
+#[pd_host_function(name = "io::exists", scope = io)]
 async fn io_exists(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,

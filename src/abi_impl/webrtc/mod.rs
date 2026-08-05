@@ -25,7 +25,7 @@ use ::webrtc::{
 use axum::body::Bytes;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use edge_abi::symbols::webrtc;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use vm::{CallOutcome, Value, Vm, VmError};
 
 use super::{SharedProxyVmContext, http};
@@ -596,7 +596,7 @@ async fn pop_next_message(io: &Arc<WebRtcIoState>) -> Result<Option<WebRtcMessag
 }
 
 /// Allocates a WebRTC connection handle.
-#[pd_edge_host_function(name = webrtc::connection::NEW.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::NEW.name, scope = webrtc)]
 async fn connection_new(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -606,7 +606,7 @@ async fn connection_new(
 }
 
 /// Returns the WebRTC connection handle for the current downstream flow.
-#[pd_edge_host_function(name = webrtc::connection::DOWNSTREAM.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::DOWNSTREAM.name, scope = webrtc)]
 async fn connection_downstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -617,7 +617,7 @@ async fn connection_downstream(
 }
 
 /// Returns the default upstream handle for the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::DEFAULT_UPSTREAM.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::DEFAULT_UPSTREAM.name, scope = webrtc)]
 async fn connection_default_upstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -628,7 +628,7 @@ async fn connection_default_upstream(
 }
 
 /// Returns whether the WebRTC connection handle is present.
-#[pd_edge_host_function(name = webrtc::connection::IS_PRESENT.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::IS_PRESENT.name, scope = webrtc)]
 async fn connection_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -644,7 +644,7 @@ async fn connection_is_present(
 }
 
 /// Sets the ICE server list for the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::SET_ICE_SERVERS.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::SET_ICE_SERVERS.name, scope = webrtc)]
 async fn connection_set_ice_servers(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -666,7 +666,7 @@ async fn connection_set_ice_servers(
 }
 
 /// Sets the data channel label for the WebRTC connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = webrtc::connection::SET_DATA_CHANNEL_LABEL.name,
     scope = webrtc
 )]
@@ -695,7 +695,7 @@ async fn connection_set_data_channel_label(
 }
 
 /// Sets the remote session description for the WebRTC connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = webrtc::connection::SET_REMOTE_DESCRIPTION.name,
     scope = webrtc
 )]
@@ -721,7 +721,7 @@ async fn connection_set_remote_description(
 }
 
 /// Creates an SDP offer for the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::CREATE_OFFER.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::CREATE_OFFER.name, scope = webrtc)]
 async fn connection_create_offer(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -756,7 +756,7 @@ async fn connection_create_offer(
 }
 
 /// Creates an SDP answer for the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::CREATE_ANSWER.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::CREATE_ANSWER.name, scope = webrtc)]
 async fn connection_create_answer(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -790,7 +790,7 @@ async fn connection_create_answer(
 }
 
 /// Attempts to connect the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::CONNECT.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::CONNECT.name, scope = webrtc)]
 async fn connection_connect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -810,7 +810,7 @@ async fn connection_connect(
 }
 
 /// Returns the current phase for the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::GET_PHASE.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::GET_PHASE.name, scope = webrtc)]
 async fn connection_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -830,7 +830,7 @@ async fn connection_get_phase(
 }
 
 /// Sends a text message over the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::SEND_TEXT.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::SEND_TEXT.name, scope = webrtc)]
 async fn connection_send_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -853,7 +853,7 @@ async fn connection_send_text(
 }
 
 /// Reads a text message from the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::READ_TEXT.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::READ_TEXT.name, scope = webrtc)]
 async fn connection_read_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -876,7 +876,7 @@ async fn connection_read_text(
 }
 
 /// Sends a base64-encoded binary message over the WebRTC connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = webrtc::connection::SEND_BINARY_BASE64.name,
     scope = webrtc
 )]
@@ -909,7 +909,7 @@ async fn connection_send_binary_base64(
 }
 
 /// Sends a binary message over the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::SEND_BINARY.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::SEND_BINARY.name, scope = webrtc)]
 async fn connection_send_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -933,7 +933,7 @@ async fn connection_send_binary(
 }
 
 /// Reads a base64-encoded binary message from the WebRTC connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = webrtc::connection::READ_BINARY_BASE64.name,
     scope = webrtc
 )]
@@ -959,7 +959,7 @@ async fn connection_read_binary_base64(
 }
 
 /// Reads a binary message from the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::READ_BINARY.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::READ_BINARY.name, scope = webrtc)]
 async fn connection_read_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -980,7 +980,7 @@ async fn connection_read_binary(
 }
 
 /// Returns whether the WebRTC connection has reached EOF.
-#[pd_edge_host_function(name = webrtc::connection::EOF.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::EOF.name, scope = webrtc)]
 async fn connection_eof(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -997,7 +997,7 @@ async fn connection_eof(
 }
 
 /// Closes the WebRTC connection.
-#[pd_edge_host_function(name = webrtc::connection::CLOSE.name, scope = webrtc)]
+#[pd_host_function(name = webrtc::connection::CLOSE.name, scope = webrtc)]
 async fn connection_close(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

@@ -17,7 +17,7 @@ use super::{
 use crate::abi_impl::schedule_current_future_call;
 use axum::http::Method;
 use edge_abi::symbols::http::exchange as http_exchange;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use vm::{CallOutcome, CallReturn, Value, Vm, VmError};
 
 fn unknown_exchange_handle(handle: i64) -> VmError {
@@ -276,14 +276,14 @@ fn set_exchange_scheme_call(
 }
 
 /// Allocates an outbound HTTP exchange handle.
-#[pd_edge_host_function(name = http_exchange::NEW.name, scope = http)]
+#[pd_host_function(name = http_exchange::NEW.name, scope = http)]
 fn new_exchange(context: SharedProxyVmContext) -> Result<CallOutcome, VmError> {
     let handle = allocate_outbound_exchange_handle(&context)?;
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(handle))))
 }
 
 /// Returns the default upstream handle for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::DEFAULT_UPSTREAM.name, scope = http)]
+#[pd_host_function(name = http_exchange::DEFAULT_UPSTREAM.name, scope = http)]
 fn default_upstream_exchange(_context: SharedProxyVmContext) -> Result<CallOutcome, VmError> {
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(
         default_upstream_exchange_handle(),
@@ -291,7 +291,7 @@ fn default_upstream_exchange(_context: SharedProxyVmContext) -> Result<CallOutco
 }
 
 /// Configures the inherited default upstream request target, version, and header batch.
-#[pd_edge_host_function(name = http_exchange::PREPARE_DEFAULT_UPSTREAM.name, scope = http)]
+#[pd_host_function(name = http_exchange::PREPARE_DEFAULT_UPSTREAM.name, scope = http)]
 fn prepare_default_upstream(
     context: SharedProxyVmContext,
     host: &str,
@@ -303,7 +303,7 @@ fn prepare_default_upstream(
 }
 
 /// Sends the outbound HTTP exchange and starts its response stream.
-#[pd_edge_host_function(name = http_exchange::SEND.name, scope = http)]
+#[pd_host_function(name = http_exchange::SEND.name, scope = http)]
 async fn send_exchange(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -315,7 +315,7 @@ async fn send_exchange(
 }
 
 /// Sets a header on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_HEADER.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_HEADER.name, scope = http)]
 fn set_exchange_header(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -326,7 +326,7 @@ fn set_exchange_header(
 }
 
 /// Sets the HTTP method on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_METHOD.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_METHOD.name, scope = http)]
 fn set_exchange_method(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -341,7 +341,7 @@ fn set_exchange_method(
 }
 
 /// Sets the request path on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_PATH.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_PATH.name, scope = http)]
 fn set_exchange_path(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -359,7 +359,7 @@ fn set_exchange_path(
 }
 
 /// Sets the decoded query string on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_QUERY.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_QUERY.name, scope = http)]
 fn set_exchange_query(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -369,7 +369,7 @@ fn set_exchange_query(
 }
 
 /// Sets the preferred HTTP version for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_VERSION.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_VERSION.name, scope = http)]
 fn set_exchange_version(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -383,7 +383,7 @@ fn set_exchange_version(
 }
 
 /// Returns the configured HTTP version preference for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::GET_VERSION.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_VERSION.name, scope = http)]
 fn get_exchange_version(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -397,7 +397,7 @@ fn get_exchange_version(
 }
 
 /// Sets the target endpoint for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_TARGET.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_TARGET.name, scope = http)]
 fn set_exchange_target(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -408,7 +408,7 @@ fn set_exchange_target(
 }
 
 /// Sets the request scheme for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_SCHEME.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_SCHEME.name, scope = http)]
 fn set_exchange_scheme(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -418,7 +418,7 @@ fn set_exchange_scheme(
 }
 
 /// Attaches a TCP stream as the transport for an outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::ATTACH_TCP.name, scope = http)]
+#[pd_host_function(name = http_exchange::ATTACH_TCP.name, scope = http)]
 fn attach_exchange_tcp(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -431,7 +431,7 @@ fn attach_exchange_tcp(
 
 #[cfg(feature = "tls")]
 /// Attaches a TLS plaintext session as the transport for an outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::ATTACH_TLS_PLAINTEXT.name, scope = http)]
+#[pd_host_function(name = http_exchange::ATTACH_TLS_PLAINTEXT.name, scope = http)]
 fn attach_exchange_tls_plaintext(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -443,7 +443,7 @@ fn attach_exchange_tls_plaintext(
 }
 
 /// Sets the body for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_BODY.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_BODY.name, scope = http)]
 fn set_exchange_body(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -456,7 +456,7 @@ fn set_exchange_body(
 }
 
 /// Adds a header value to the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::ADD_HEADER.name, scope = http)]
+#[pd_host_function(name = http_exchange::ADD_HEADER.name, scope = http)]
 fn add_exchange_header(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -471,7 +471,7 @@ fn add_exchange_header(
 }
 
 /// Clears all values for a header on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::CLEAR_HEADER.name, scope = http)]
+#[pd_host_function(name = http_exchange::CLEAR_HEADER.name, scope = http)]
 fn clear_exchange_header(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -485,7 +485,7 @@ fn clear_exchange_header(
 }
 
 /// Sets a query parameter on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::SET_QUERY_ARG.name, scope = http)]
+#[pd_host_function(name = http_exchange::SET_QUERY_ARG.name, scope = http)]
 fn set_exchange_query_arg(
     context: SharedProxyVmContext,
     exchange: i64,
@@ -504,7 +504,7 @@ fn set_exchange_query_arg(
 }
 
 /// Returns the status code for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::GET_STATUS.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_STATUS.name, scope = http)]
 fn get_exchange_status(
     vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -516,7 +516,7 @@ fn get_exchange_status(
 }
 
 /// Returns the first value for a header on the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::GET_HEADER.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_HEADER.name, scope = http)]
 fn get_exchange_header(
     vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -536,7 +536,7 @@ fn get_exchange_header(
 }
 
 /// Returns all headers on the outbound HTTP exchange as a map.
-#[pd_edge_host_function(name = http_exchange::GET_HEADERS.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_HEADERS.name, scope = http)]
 fn get_exchange_headers(
     vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -548,7 +548,7 @@ fn get_exchange_headers(
 }
 
 /// Returns the full body for the outbound HTTP exchange as text.
-#[pd_edge_host_function(name = http_exchange::GET_BODY.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_BODY.name, scope = http)]
 async fn get_exchange_body(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -561,7 +561,7 @@ async fn get_exchange_body(
 }
 
 /// Returns the first trailer value for the outbound HTTP exchange.
-#[pd_edge_host_function(name = "http::exchange::get_trailer", scope = http)]
+#[pd_host_function(name = "http::exchange::get_trailer", scope = http)]
 async fn get_exchange_trailer(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -582,7 +582,7 @@ async fn get_exchange_trailer(
 }
 
 /// Returns all trailers on the outbound HTTP exchange as a map.
-#[pd_edge_host_function(name = "http::exchange::get_trailers", scope = http)]
+#[pd_host_function(name = "http::exchange::get_trailers", scope = http)]
 async fn get_exchange_trailers(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -595,7 +595,7 @@ async fn get_exchange_trailers(
 }
 
 /// Returns the HTTP version for the outbound HTTP exchange.
-#[pd_edge_host_function(name = http_exchange::GET_HTTP_VERSION.name, scope = http)]
+#[pd_host_function(name = http_exchange::GET_HTTP_VERSION.name, scope = http)]
 fn get_exchange_http_version(
     vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -607,7 +607,7 @@ fn get_exchange_http_version(
 }
 
 /// Reads the next body chunk from the outbound HTTP exchange.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = http_exchange::body::NEXT_CHUNK.name,
     scope = http_extension
 )]
@@ -630,7 +630,7 @@ async fn get_exchange_body_next_chunk(
 }
 
 /// Returns whether the body stream for the outbound HTTP exchange is exhausted.
-#[pd_edge_host_function(name = http_exchange::body::EOF.name, scope = http_extension)]
+#[pd_host_function(name = http_exchange::body::EOF.name, scope = http_extension)]
 async fn get_exchange_body_eof(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

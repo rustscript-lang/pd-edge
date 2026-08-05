@@ -2,7 +2,6 @@
 members = [
     ".",
     "pd-edge-abi",
-    "pd-edge-host-function",
 ]
 resolver = "2"
 
@@ -69,7 +68,7 @@ h2 = { version = "0.4", optional = true }
 h3 = { version = "0.0.8", optional = true }
 h3-quinn = { version = "0.0.10", optional = true }
 futures-util = "0.3"
-pd-edge-host-function = { path = "./pd-edge-host-function", version = "0.1.0" }
+pd-host-function = { path = "../rustscript/pd-host-function", version = "0.1.0" }
 linkme = "0.3"
 vm = { package = "pd-vm", path = "../rustscript", version = "0.1.0", default-features = false, features = ["runtime"] }
 edge_abi = { package = "pd-edge-abi", path = "./pd-edge-abi", version = "0.1.0", default-features = false }

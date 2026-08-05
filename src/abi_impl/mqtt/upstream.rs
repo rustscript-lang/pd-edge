@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use axum::http::uri::Authority;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use edge_abi::symbols::mqtt;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, lookup_host};
 use tokio::time::timeout;
@@ -1124,7 +1124,7 @@ async fn read_next_event_value(
 }
 
 /// Allocates an MQTT connection handle.
-#[pd_edge_host_function(name = mqtt::connection::NEW.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::NEW.name, scope = mqtt)]
 async fn connection_new(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1134,7 +1134,7 @@ async fn connection_new(
 }
 
 /// Returns the default upstream handle for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::DEFAULT_UPSTREAM.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::DEFAULT_UPSTREAM.name, scope = mqtt)]
 async fn connection_default_upstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -1145,7 +1145,7 @@ async fn connection_default_upstream(
 }
 
 /// Returns whether the MQTT connection handle is present.
-#[pd_edge_host_function(name = mqtt::connection::IS_PRESENT.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::IS_PRESENT.name, scope = mqtt)]
 async fn connection_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1158,7 +1158,7 @@ async fn connection_is_present(
 }
 
 /// Sets the scheme for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_SCHEME.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_SCHEME.name, scope = mqtt)]
 async fn connection_set_scheme(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1174,7 +1174,7 @@ async fn connection_set_scheme(
 }
 
 /// Sets the target endpoint for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_TARGET.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_TARGET.name, scope = mqtt)]
 async fn connection_set_target(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1191,7 +1191,7 @@ async fn connection_set_target(
 }
 
 /// Sets the client identifier for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_CLIENT_ID.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_CLIENT_ID.name, scope = mqtt)]
 async fn connection_set_client_id(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1206,7 +1206,7 @@ async fn connection_set_client_id(
 }
 
 /// Sets the username for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_USERNAME.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_USERNAME.name, scope = mqtt)]
 async fn connection_set_username(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1221,7 +1221,7 @@ async fn connection_set_username(
 }
 
 /// Sets the password for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_PASSWORD.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_PASSWORD.name, scope = mqtt)]
 async fn connection_set_password(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1236,7 +1236,7 @@ async fn connection_set_password(
 }
 
 /// Sets the keep-alive interval for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_KEEP_ALIVE_SECS.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_KEEP_ALIVE_SECS.name, scope = mqtt)]
 async fn connection_set_keep_alive_secs(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1256,7 +1256,7 @@ async fn connection_set_keep_alive_secs(
 }
 
 /// Enables or disables clean start for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::SET_CLEAN_START.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SET_CLEAN_START.name, scope = mqtt)]
 async fn connection_set_clean_start(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1271,7 +1271,7 @@ async fn connection_set_clean_start(
 }
 
 /// Connects the MQTT session over its attached transport carrier.
-#[pd_edge_host_function(name = mqtt::connection::CONNECT.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::CONNECT.name, scope = mqtt)]
 async fn connection_connect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1284,7 +1284,7 @@ async fn connection_connect(
 }
 
 /// Reports the current lifecycle phase for the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::GET_PHASE.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::GET_PHASE.name, scope = mqtt)]
 async fn connection_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1299,7 +1299,7 @@ async fn connection_get_phase(
 }
 
 /// Sends an MQTT DISCONNECT and closes the carrier.
-#[pd_edge_host_function(name = mqtt::connection::DISCONNECT.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::DISCONNECT.name, scope = mqtt)]
 async fn connection_disconnect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1331,7 +1331,7 @@ async fn connection_disconnect(
 }
 
 /// Publishes a UTF-8 text payload on the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::PUBLISH_TEXT.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::PUBLISH_TEXT.name, scope = mqtt)]
 async fn connection_publish_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1356,7 +1356,7 @@ async fn connection_publish_text(
 }
 
 /// Publishes a binary payload on the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::PUBLISH_BINARY.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::PUBLISH_BINARY.name, scope = mqtt)]
 async fn connection_publish_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1374,7 +1374,7 @@ async fn connection_publish_binary(
 }
 
 /// Publishes a base64-encoded binary payload on the MQTT connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = mqtt::connection::PUBLISH_BINARY_BASE64.name,
     scope = mqtt
 )]
@@ -1397,7 +1397,7 @@ async fn connection_publish_binary_base64(
 }
 
 /// Subscribes the MQTT connection to a topic filter.
-#[pd_edge_host_function(name = mqtt::connection::SUBSCRIBE.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::SUBSCRIBE.name, scope = mqtt)]
 async fn connection_subscribe(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1412,7 +1412,7 @@ async fn connection_subscribe(
 }
 
 /// Removes a topic filter subscription from the MQTT connection.
-#[pd_edge_host_function(name = mqtt::connection::UNSUBSCRIBE.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::UNSUBSCRIBE.name, scope = mqtt)]
 async fn connection_unsubscribe(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1426,7 +1426,7 @@ async fn connection_unsubscribe(
 }
 
 /// Reads the next MQTT event from the connection.
-#[pd_edge_host_function(name = mqtt::connection::READ_EVENT.name, scope = mqtt)]
+#[pd_host_function(name = mqtt::connection::READ_EVENT.name, scope = mqtt)]
 async fn connection_read_event(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

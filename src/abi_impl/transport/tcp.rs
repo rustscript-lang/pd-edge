@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::http::uri::Authority;
 use edge_abi::symbols::tcp;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpSocket, lookup_host},
@@ -703,7 +703,7 @@ fn append_downstream_response(context: &SharedProxyVmContext, text: &str) -> Res
 }
 
 /// Returns the TCP stream handle for the current downstream flow.
-#[pd_edge_host_function(name = tcp::stream::DOWNSTREAM.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::DOWNSTREAM.name, scope = transport)]
 async fn stream_downstream(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -715,7 +715,7 @@ async fn stream_downstream(
 }
 
 /// Returns the default upstream handle for the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::DEFAULT_UPSTREAM.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::DEFAULT_UPSTREAM.name, scope = transport)]
 async fn stream_default_upstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -726,14 +726,14 @@ async fn stream_default_upstream(
 }
 
 /// Allocates a TCP stream handle.
-#[pd_edge_host_function(name = tcp::stream::NEW.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::NEW.name, scope = transport)]
 async fn stream_new(_vm: &mut Vm, context: SharedProxyVmContext) -> Result<CallOutcome, VmError> {
     let handle = allocate_tcp_stream_handle(&context)?;
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(handle))))
 }
 
 /// Returns whether the TCP stream handle is present.
-#[pd_edge_host_function(name = tcp::stream::IS_PRESENT.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::IS_PRESENT.name, scope = transport)]
 async fn stream_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -751,7 +751,7 @@ async fn stream_is_present(
 }
 
 /// Binds the TCP stream to a local address.
-#[pd_edge_host_function(name = tcp::stream::BIND.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::BIND.name, scope = transport)]
 async fn stream_bind(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -767,7 +767,7 @@ async fn stream_bind(
 }
 
 /// Sets the target endpoint for the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::SET_TARGET.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::SET_TARGET.name, scope = transport)]
 async fn stream_set_target(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -785,7 +785,7 @@ async fn stream_set_target(
 }
 
 /// Attempts to connect the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::CONNECT.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::CONNECT.name, scope = transport)]
 async fn stream_connect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -796,7 +796,7 @@ async fn stream_connect(
 }
 
 /// Reports the current lifecycle phase for a TCP stream handle.
-#[pd_edge_host_function(name = tcp::stream::GET_PHASE.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::GET_PHASE.name, scope = transport)]
 async fn stream_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -829,7 +829,7 @@ async fn stream_get_phase(
 }
 
 /// Returns the local address for the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::GET_LOCAL_ADDR.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::GET_LOCAL_ADDR.name, scope = transport)]
 async fn stream_get_local_addr(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -850,7 +850,7 @@ async fn stream_get_local_addr(
 }
 
 /// Returns the peer address for the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::GET_PEER_ADDR.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::GET_PEER_ADDR.name, scope = transport)]
 async fn stream_get_peer_addr(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -877,7 +877,7 @@ async fn stream_get_peer_addr(
 }
 
 /// Reads text from the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::READ.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::READ.name, scope = transport)]
 async fn stream_read(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -962,7 +962,7 @@ async fn stream_read(
 }
 
 /// Reads binary bytes from the TCP stream as an integer array.
-#[pd_edge_host_function(name = tcp::stream::READ_BINARY.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::READ_BINARY.name, scope = transport)]
 async fn stream_read_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -979,7 +979,7 @@ async fn stream_read_binary(
 }
 
 /// Reads exactly the requested number of binary bytes from the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::READ_EXACT_BINARY.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::READ_EXACT_BINARY.name, scope = transport)]
 async fn stream_read_exact_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1018,7 +1018,7 @@ async fn stream_read_exact_binary(
 }
 
 /// Peeks text from the TCP stream without advancing the VM-visible read cursor.
-#[pd_edge_host_function(name = tcp::stream::PEEK.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::PEEK.name, scope = transport)]
 async fn stream_peek(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1090,7 +1090,7 @@ async fn stream_peek(
 }
 
 /// Peeks binary bytes from the TCP stream without advancing the VM-visible read cursor.
-#[pd_edge_host_function(name = tcp::stream::PEEK_BINARY.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::PEEK_BINARY.name, scope = transport)]
 async fn stream_peek_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1163,7 +1163,7 @@ async fn stream_peek_binary(
 }
 
 /// Writes text to the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::WRITE.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::WRITE.name, scope = transport)]
 async fn stream_write(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1233,7 +1233,7 @@ async fn stream_write(
 }
 
 /// Writes binary bytes to the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::WRITE_BINARY.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::WRITE_BINARY.name, scope = transport)]
 async fn stream_write_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1308,7 +1308,7 @@ async fn stream_write_binary(
 }
 
 /// Returns whether the TCP stream has reached EOF.
-#[pd_edge_host_function(name = tcp::stream::EOF.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::EOF.name, scope = transport)]
 async fn stream_eof(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1347,7 +1347,7 @@ async fn stream_eof(
 }
 
 /// Closes the TCP stream.
-#[pd_edge_host_function(name = tcp::stream::CLOSE.name, scope = transport)]
+#[pd_host_function(name = tcp::stream::CLOSE.name, scope = transport)]
 async fn stream_close(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

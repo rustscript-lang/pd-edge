@@ -153,7 +153,7 @@ fn parse_function_decl(
         .or_else(|| (!spec_docs.trim().is_empty()).then_some(spec_docs))
         .unwrap_or_else(|| {
             panic!(
-                "edge ABI function '{name}' is missing /// doc comments on its #[pd_edge_host_function] implementation or ABI spec declaration"
+                "edge ABI function '{name}' is missing /// doc comments on its #[pd_host_function] implementation or ABI spec declaration"
             )
         });
 
@@ -224,7 +224,7 @@ fn collect_edge_impl_docs_from_items(
                 if !edge_impl_cfg_matches(&function.attrs, enabled_features) {
                     continue;
                 }
-                let Some(name) = pd_edge_host_function_name(&function.attrs) else {
+                let Some(name) = pd_host_function_name(&function.attrs) else {
                     continue;
                 };
                 let docs = doc_string(&function.attrs);
@@ -235,7 +235,7 @@ fn collect_edge_impl_docs_from_items(
                     Some(existing) if existing == &docs => {}
                     Some(existing) => {
                         panic!(
-                            "duplicate pd_edge_host_function docs for '{name}': {:?} vs {:?}",
+                            "duplicate pd_host_function docs for '{name}': {:?} vs {:?}",
                             existing, docs
                         );
                     }
@@ -261,75 +261,46 @@ fn pd_host_function_name(attrs: &[syn::Attribute]) -> Option<String> {
     let attr = attrs
         .iter()
         .find(|attr| attr.path().is_ident("pd_host_function"))?;
-    let meta = &attr.meta;
-    let Meta::List(list) = meta else {
-        panic!("#[pd_host_function] must use name = \"...\"");
+    let Meta::List(list) = &attr.meta else {
+        panic!("#[pd_host_function] must use name = ...");
     };
     let args = list
         .parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
         .unwrap_or_else(|err| panic!("failed to parse #[pd_host_function(...)] args: {err}"));
-    let Some(Meta::NameValue(name_value)) = args.first() else {
-        panic!("#[pd_host_function] requires name = \"...\"");
-    };
-    if !name_value.path.is_ident("name") {
-        panic!("#[pd_host_function] only supports name = \"...\"");
-    }
-    match &name_value.value {
-        syn::Expr::Lit(expr_lit) => {
-            if let syn::Lit::Str(value) = &expr_lit.lit {
-                Some(value.value())
-            } else {
-                panic!("callable name must be a string literal");
-            }
-        }
-        _ => panic!("callable name must be a string literal"),
-    }
-}
-
-fn pd_edge_host_function_name(attrs: &[syn::Attribute]) -> Option<String> {
-    let attr = attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("pd_edge_host_function"))?;
-    let Meta::List(list) = &attr.meta else {
-        panic!("#[pd_edge_host_function] must use name = ..., scope = ...");
-    };
-    let args = list
-        .parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
-        .unwrap_or_else(|err| panic!("failed to parse #[pd_edge_host_function(...)] args: {err}"));
     let name_value = args
         .iter()
         .find_map(|meta| match meta {
             Meta::NameValue(name_value) if name_value.path.is_ident("name") => Some(name_value),
             _ => None,
         })
-        .unwrap_or_else(|| panic!("#[pd_edge_host_function] requires name = ..."));
-    Some(edge_host_name_expr(&name_value.value))
+        .unwrap_or_else(|| panic!("#[pd_host_function] requires name = ..."));
+    Some(host_name_expr(&name_value.value))
 }
 
-fn edge_host_name_expr(value: &syn::Expr) -> String {
+fn host_name_expr(value: &syn::Expr) -> String {
     match value {
         syn::Expr::Lit(expr_lit) => match &expr_lit.lit {
             syn::Lit::Str(value) => value.value(),
-            _ => panic!("edge host callable name must be a string literal or <path>.name"),
+            _ => panic!("host callable name must be a string literal or <path>.name"),
         },
         syn::Expr::Field(field) => {
             let syn::Member::Named(member) = &field.member else {
-                panic!("edge host callable name must use .name");
+                panic!("host callable name must use .name");
             };
             if member != "name" {
-                panic!("edge host callable name must use .name");
+                panic!("host callable name must use .name");
             }
             let syn::Expr::Path(path) = field.base.as_ref() else {
-                panic!("edge host callable name must use a path ending in .name");
+                panic!("host callable name must use a path ending in .name");
             };
-            canonicalize_edge_host_path(&path.path)
+            canonicalize_host_path(&path.path)
         }
-        syn::Expr::Path(path) => canonicalize_edge_host_path(&path.path),
-        _ => panic!("edge host callable name must be a string literal or <path>.name"),
+        syn::Expr::Path(path) => canonicalize_host_path(&path.path),
+        _ => panic!("host callable name must be a string literal or <path>.name"),
     }
 }
 
-fn canonicalize_edge_host_path(path: &syn::Path) -> String {
+fn canonicalize_host_path(path: &syn::Path) -> String {
     let segments = path
         .segments
         .iter()

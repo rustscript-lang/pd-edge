@@ -1801,7 +1801,7 @@ dependencies = [
  "owo-colors",
  "parking_lot",
  "pd-edge-abi 0.1.0",
- "pd-edge-host-function",
+ "pd-host-function 0.1.0",
  "pd-vm",
  "quinn",
  "rand 0.8.5",
@@ -1845,15 +1845,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pd-edge-host-function"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "pd-host-function"
 version = "0.1.0"
 dependencies = [
@@ -1890,6 +1881,7 @@ dependencies = [
  "pd-host-function 0.1.0",
  "regex",
  "rt-format",
+ "self_cell",
  "serde",
  "serde_json",
  "syn",
@@ -2570,6 +2562,12 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
+
+[[package]]
+name = "self_cell"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab42ca02749e120097e328d91d415325bdf43b1c72c4c8badf37375fe40a813"
 
 [[package]]
 name = "semver"

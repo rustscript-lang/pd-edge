@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use edge_abi::symbols::proxy as proxy_symbols;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Notify,
@@ -920,7 +920,7 @@ async fn drive_forward(
 }
 
 /// Returns the proxy byte stream handle for the current downstream flow.
-#[pd_edge_host_function(name = proxy_symbols::stream::DOWNSTREAM.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::stream::DOWNSTREAM.name, scope = proxy)]
 fn stream_downstream(context: SharedProxyVmContext) -> Result<CallOutcome, VmError> {
     let endpoint = downstream_proxy_endpoint(&context);
     let handle = if let Some(handle) = reserved_proxy_stream_handle(&endpoint) {
@@ -932,7 +932,7 @@ fn stream_downstream(context: SharedProxyVmContext) -> Result<CallOutcome, VmErr
 }
 
 /// Wraps an outbound HTTP exchange as a proxy byte stream.
-#[pd_edge_host_function(name = proxy_symbols::stream::EXCHANGE.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::stream::EXCHANGE.name, scope = proxy)]
 fn stream_exchange(context: SharedProxyVmContext, exchange: i64) -> Result<CallOutcome, VmError> {
     if !http_state::outbound_exchange_exists(&context, exchange) {
         return Err(VmError::HostError(format!(
@@ -949,7 +949,7 @@ fn stream_exchange(context: SharedProxyVmContext, exchange: i64) -> Result<CallO
 }
 
 /// Wraps a TCP stream as a proxy byte stream.
-#[pd_edge_host_function(name = proxy_symbols::stream::FROM_TCP.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::stream::FROM_TCP.name, scope = proxy)]
 fn stream_from_tcp(context: SharedProxyVmContext, stream: i64) -> Result<CallOutcome, VmError> {
     let endpoint = endpoint_from_tcp_stream(&context, stream)?;
     let handle = if let Some(handle) = reserved_proxy_stream_handle(&endpoint) {
@@ -961,7 +961,7 @@ fn stream_from_tcp(context: SharedProxyVmContext, stream: i64) -> Result<CallOut
 }
 
 /// Wraps a TLS plaintext session as a proxy byte stream.
-#[pd_edge_host_function(name = proxy_symbols::stream::FROM_TLS_PLAINTEXT.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::stream::FROM_TLS_PLAINTEXT.name, scope = proxy)]
 fn stream_from_tls_plaintext(
     context: SharedProxyVmContext,
     session: i64,
@@ -976,7 +976,7 @@ fn stream_from_tls_plaintext(
 }
 
 /// Wraps a WebSocket connection as a proxy byte stream.
-#[pd_edge_host_function(name = proxy_symbols::stream::FROM_WEBSOCKET_BINARY.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::stream::FROM_WEBSOCKET_BINARY.name, scope = proxy)]
 fn stream_from_websocket_binary(
     context: SharedProxyVmContext,
     connection: i64,
@@ -990,7 +990,7 @@ fn stream_from_websocket_binary(
 ///
 /// This always uses the buffered proxy stream loop. On EOF from `source`, the destination write
 /// side is closed.
-#[pd_edge_host_function(name = proxy_symbols::PIPE.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::PIPE.name, scope = proxy)]
 async fn proxy_pipe(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1009,7 +1009,7 @@ async fn proxy_pipe(
 ///
 /// `proxy::forward` first tries native forward/handoff pairs. If no native handoff is available,
 /// it falls back to the buffered bidirectional proxy stream loop using `max_bytes` chunks.
-#[pd_edge_host_function(name = proxy_symbols::FORWARD.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::FORWARD.name, scope = proxy)]
 async fn proxy_forward(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1036,7 +1036,7 @@ async fn proxy_forward(
 ///   has already been written through the proxy stream API
 ///
 /// Unsupported pairs return an error. Use `proxy::forward` when you want buffered fallback.
-#[pd_edge_host_function(name = proxy_symbols::FORWARD_NATIVE.name, scope = proxy)]
+#[pd_host_function(name = proxy_symbols::FORWARD_NATIVE.name, scope = proxy)]
 async fn proxy_forward_native(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

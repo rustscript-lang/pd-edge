@@ -6,7 +6,7 @@ use axum::http::{
     uri::Authority,
 };
 use edge_abi::symbols::websocket;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio_tungstenite::{
     accept_hdr_async, connect_async,
     tungstenite::{
@@ -923,7 +923,7 @@ pub(crate) async fn close_websocket_binary_stream(
 }
 
 /// Allocates a WebSocket connection handle.
-#[pd_edge_host_function(name = websocket::connection::NEW.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::NEW.name, scope = websocket)]
 async fn connection_new(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -933,7 +933,7 @@ async fn connection_new(
 }
 
 /// Returns the WebSocket connection handle for the current downstream flow.
-#[pd_edge_host_function(name = websocket::connection::DOWNSTREAM.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::DOWNSTREAM.name, scope = websocket)]
 async fn connection_downstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -944,7 +944,7 @@ async fn connection_downstream(
 }
 
 /// Returns the default upstream handle for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::DEFAULT_UPSTREAM.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::DEFAULT_UPSTREAM.name, scope = websocket)]
 async fn connection_default_upstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -955,7 +955,7 @@ async fn connection_default_upstream(
 }
 
 /// Returns whether the WebSocket connection handle is present.
-#[pd_edge_host_function(name = websocket::connection::IS_PRESENT.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::IS_PRESENT.name, scope = websocket)]
 async fn connection_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -974,7 +974,7 @@ async fn connection_is_present(
 }
 
 /// Sets the target endpoint for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_TARGET.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_TARGET.name, scope = websocket)]
 async fn connection_set_target(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -992,7 +992,7 @@ async fn connection_set_target(
 }
 
 /// Sets the scheme for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_SCHEME.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_SCHEME.name, scope = websocket)]
 async fn connection_set_scheme(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1009,7 +1009,7 @@ async fn connection_set_scheme(
 }
 
 /// Sets the path for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_PATH.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_PATH.name, scope = websocket)]
 async fn connection_set_path(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1026,7 +1026,7 @@ async fn connection_set_path(
 }
 
 /// Sets the query string for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_QUERY.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_QUERY.name, scope = websocket)]
 async fn connection_set_query(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1043,7 +1043,7 @@ async fn connection_set_query(
 }
 
 /// Sets a header on the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_HEADER.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_HEADER.name, scope = websocket)]
 async fn connection_set_header(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1061,7 +1061,7 @@ async fn connection_set_header(
 }
 
 /// Sets the preferred subprotocol list for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SET_SUBPROTOCOLS.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SET_SUBPROTOCOLS.name, scope = websocket)]
 async fn connection_set_subprotocols(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1092,7 +1092,7 @@ async fn connection_set_subprotocols(
 }
 
 /// Attempts to connect the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::CONNECT.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::CONNECT.name, scope = websocket)]
 async fn connection_connect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1103,7 +1103,7 @@ async fn connection_connect(
 }
 
 /// Returns the current phase for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::GET_PHASE.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::GET_PHASE.name, scope = websocket)]
 async fn connection_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1117,7 +1117,7 @@ async fn connection_get_phase(
 }
 
 /// Returns the negotiated subprotocol for the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::GET_SUBPROTOCOL.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::GET_SUBPROTOCOL.name, scope = websocket)]
 async fn connection_get_subprotocol(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1130,7 +1130,7 @@ async fn connection_get_subprotocol(
 }
 
 /// Sends a text message over the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SEND_TEXT.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SEND_TEXT.name, scope = websocket)]
 async fn connection_send_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1147,7 +1147,7 @@ async fn connection_send_text(
 }
 
 /// Reads a text message from the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::READ_TEXT.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::READ_TEXT.name, scope = websocket)]
 async fn connection_read_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1165,7 +1165,7 @@ async fn connection_read_text(
 }
 
 /// Sends a base64-encoded binary message over the WebSocket connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = websocket::connection::SEND_BINARY_BASE64.name,
     scope = websocket
 )]
@@ -1185,7 +1185,7 @@ async fn connection_send_binary_base64(
 }
 
 /// Sends a binary message over the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::SEND_BINARY.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::SEND_BINARY.name, scope = websocket)]
 async fn connection_send_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1203,7 +1203,7 @@ async fn connection_send_binary(
 }
 
 /// Reads a base64-encoded binary message from the WebSocket connection.
-#[pd_edge_host_function(
+#[pd_host_function(
     name = websocket::connection::READ_BINARY_BASE64.name,
     scope = websocket
 )]
@@ -1224,7 +1224,7 @@ async fn connection_read_binary_base64(
 }
 
 /// Reads a binary message from the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::READ_BINARY.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::READ_BINARY.name, scope = websocket)]
 async fn connection_read_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1242,7 +1242,7 @@ async fn connection_read_binary(
 }
 
 /// Returns whether the WebSocket connection has reached EOF.
-#[pd_edge_host_function(name = websocket::connection::EOF.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::EOF.name, scope = websocket)]
 async fn connection_eof(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1254,7 +1254,7 @@ async fn connection_eof(
 }
 
 /// Closes the WebSocket connection.
-#[pd_edge_host_function(name = websocket::connection::CLOSE.name, scope = websocket)]
+#[pd_host_function(name = websocket::connection::CLOSE.name, scope = websocket)]
 async fn connection_close(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

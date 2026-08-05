@@ -30,7 +30,7 @@ jobs:
     permissions:
       contents: read
     env:
-      PACKAGE_ORDER: pd-edge-host-function pd-edge-abi pd-edge
+      PACKAGE_ORDER: pd-edge-abi pd-edge
       PD_VM_VERSION: ${{ inputs.pd_vm_version || '0.22.2' }}
       PD_HOST_FUNCTION_VERSION: ${{ inputs.pd_host_function_version || '0.22.2' }}
       WORKSPACE_VERSION_OVERRIDES: pd-edge=${{ inputs.version }} rustscript=${{ inputs.pd_vm_version || '0.22.2' }}
@@ -71,7 +71,6 @@ jobs:
           from pathlib import Path
           version = os.environ['PUBLISH_VERSION']
           dep_versions = {
-              'pd-edge-host-function': version,
               'pd-edge-abi': version,
               'pd-edge': version,
               'pd-vm': os.environ.get('PD_VM_VERSION') or version,

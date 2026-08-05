@@ -6,7 +6,7 @@ use std::{
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use edge_abi::symbols::tls;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio_rustls::{
     LazyConfigAcceptor, TlsConnector,
     rustls::{
@@ -734,7 +734,7 @@ async fn take_dynamic_tcp_stream_for_tls(
 }
 
 /// Creates a TLS session handle from a connected TCP stream.
-#[pd_edge_host_function(name = tls::session::FROM_SOCKET.name, scope = transport)]
+#[pd_host_function(name = tls::session::FROM_SOCKET.name, scope = transport)]
 async fn session_from_socket(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -829,7 +829,7 @@ async fn session_from_socket(
 }
 
 /// Returns whether the TLS session handle is present.
-#[pd_edge_host_function(name = tls::session::IS_PRESENT.name, scope = transport)]
+#[pd_host_function(name = tls::session::IS_PRESENT.name, scope = transport)]
 async fn session_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -841,7 +841,7 @@ async fn session_is_present(
 }
 
 /// Returns whether the TLS session still needs explicit configuration before handshake.
-#[pd_edge_host_function(name = "tls::session::needs_configuration", scope = transport)]
+#[pd_host_function(name = "tls::session::needs_configuration", scope = transport)]
 async fn session_needs_configuration(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -853,7 +853,7 @@ async fn session_needs_configuration(
 }
 
 /// Runs the TLS handshake for the TLS session.
-#[pd_edge_host_function(name = tls::session::HANDSHAKE.name, scope = transport)]
+#[pd_host_function(name = tls::session::HANDSHAKE.name, scope = transport)]
 async fn session_handshake(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1057,7 +1057,7 @@ async fn session_handshake(
 }
 
 /// Sets the ALPN protocol list for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_ALPN.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_ALPN.name, scope = transport)]
 async fn session_set_alpn(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1073,7 +1073,7 @@ async fn session_set_alpn(
 }
 
 /// Enables or disables certificate verification for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_VERIFY.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_VERIFY.name, scope = transport)]
 async fn session_set_verify(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1088,7 +1088,7 @@ async fn session_set_verify(
 }
 
 /// Enables or disables hostname verification for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_VERIFY_HOSTNAME.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_VERIFY_HOSTNAME.name, scope = transport)]
 async fn session_set_verify_hostname(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1103,7 +1103,7 @@ async fn session_set_verify_hostname(
 }
 
 /// Sets a trusted CA certificate for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_TRUSTED_CERTIFICATE.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_TRUSTED_CERTIFICATE.name, scope = transport)]
 async fn session_set_trusted_certificate(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1118,7 +1118,7 @@ async fn session_set_trusted_certificate(
 }
 
 /// Sets the client certificate for the TLS session.
-#[pd_edge_host_function(name = "tls::session::set_client_certificate", scope = transport)]
+#[pd_host_function(name = "tls::session::set_client_certificate", scope = transport)]
 async fn session_set_client_certificate(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1133,7 +1133,7 @@ async fn session_set_client_certificate(
 }
 
 /// Sets the client private key for the TLS session.
-#[pd_edge_host_function(name = "tls::session::set_client_private_key", scope = transport)]
+#[pd_host_function(name = "tls::session::set_client_private_key", scope = transport)]
 async fn session_set_client_private_key(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1148,7 +1148,7 @@ async fn session_set_client_private_key(
 }
 
 /// Sets the server certificate for the TLS session.
-#[pd_edge_host_function(name = "tls::session::set_server_certificate", scope = transport)]
+#[pd_host_function(name = "tls::session::set_server_certificate", scope = transport)]
 async fn session_set_server_certificate(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1163,7 +1163,7 @@ async fn session_set_server_certificate(
 }
 
 /// Sets the server private key for the TLS session.
-#[pd_edge_host_function(name = "tls::session::set_server_private_key", scope = transport)]
+#[pd_host_function(name = "tls::session::set_server_private_key", scope = transport)]
 async fn session_set_server_private_key(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1178,7 +1178,7 @@ async fn session_set_server_private_key(
 }
 
 /// Enables or disables SNI for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_SNI.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_SNI.name, scope = transport)]
 async fn session_set_sni(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1193,7 +1193,7 @@ async fn session_set_sni(
 }
 
 /// Sets the minimum TLS version for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_MIN_VERSION.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_MIN_VERSION.name, scope = transport)]
 async fn session_set_min_version(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1209,7 +1209,7 @@ async fn session_set_min_version(
 }
 
 /// Sets the maximum TLS version for the TLS session.
-#[pd_edge_host_function(name = tls::session::SET_MAX_VERSION.name, scope = transport)]
+#[pd_host_function(name = tls::session::SET_MAX_VERSION.name, scope = transport)]
 async fn session_set_max_version(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1225,7 +1225,7 @@ async fn session_set_max_version(
 }
 
 /// Returns the peer certificate name for the TLS session.
-#[pd_edge_host_function(name = tls::session::GET_PEER_NAME.name, scope = transport)]
+#[pd_host_function(name = tls::session::GET_PEER_NAME.name, scope = transport)]
 async fn session_get_peer_name(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1239,7 +1239,7 @@ async fn session_get_peer_name(
 }
 
 /// Returns the observed server name for the TLS session.
-#[pd_edge_host_function(name = tls::session::GET_SERVER_NAME.name, scope = transport)]
+#[pd_host_function(name = tls::session::GET_SERVER_NAME.name, scope = transport)]
 async fn session_get_server_name(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1253,7 +1253,7 @@ async fn session_get_server_name(
 }
 
 /// Returns the negotiated ALPN protocol for the TLS session.
-#[pd_edge_host_function(name = tls::session::GET_ALPN.name, scope = transport)]
+#[pd_host_function(name = tls::session::GET_ALPN.name, scope = transport)]
 async fn session_get_alpn(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1267,7 +1267,7 @@ async fn session_get_alpn(
 }
 
 /// Returns the current phase for the TLS session.
-#[pd_edge_host_function(name = tls::session::GET_PHASE.name, scope = transport)]
+#[pd_host_function(name = tls::session::GET_PHASE.name, scope = transport)]
 async fn session_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1281,7 +1281,7 @@ async fn session_get_phase(
 }
 
 /// Returns the peer certificate for the TLS session.
-#[pd_edge_host_function(name = tls::session::GET_PEER_CERTIFICATE.name, scope = transport)]
+#[pd_host_function(name = tls::session::GET_PEER_CERTIFICATE.name, scope = transport)]
 async fn session_get_peer_certificate(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -1297,7 +1297,7 @@ async fn session_get_peer_certificate(
 }
 
 /// Returns whether the TLS session reused a previous TLS session.
-#[pd_edge_host_function(name = tls::session::IS_SESSION_REUSED.name, scope = transport)]
+#[pd_host_function(name = tls::session::IS_SESSION_REUSED.name, scope = transport)]
 async fn session_is_session_reused(
     _vm: &mut Vm,
     context: SharedProxyVmContext,

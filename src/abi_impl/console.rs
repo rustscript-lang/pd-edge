@@ -1,13 +1,13 @@
 use std::io::{self, Read, Write};
 
 use edge_abi::symbols::console as console_symbols;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use vm::{CallOutcome, Value, Vm, VmError};
 
 use super::current_console_program_args;
 
 /// Reads one line from process stdin and returns it as a string.
-#[pd_edge_host_function(name = console_symbols::stdin::READ_LINE.name, scope = console)]
+#[pd_host_function(name = console_symbols::stdin::READ_LINE.name, scope = console)]
 async fn stdin_read_line(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
     let line = tokio::task::spawn_blocking(move || {
         let mut input = String::new();
@@ -24,7 +24,7 @@ async fn stdin_read_line(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
 }
 
 /// Reads all remaining bytes from process stdin and returns them as a string.
-#[pd_edge_host_function(name = console_symbols::stdin::READ_ALL.name, scope = console)]
+#[pd_host_function(name = console_symbols::stdin::READ_ALL.name, scope = console)]
 async fn stdin_read_all(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
     let text = tokio::task::spawn_blocking(move || {
         let mut input = String::new();
@@ -41,7 +41,7 @@ async fn stdin_read_all(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
 }
 
 /// Writes text to process stdout and returns the number of bytes written.
-#[pd_edge_host_function(name = console_symbols::stdout::WRITE.name, scope = console)]
+#[pd_host_function(name = console_symbols::stdout::WRITE.name, scope = console)]
 async fn stdout_write(_vm: &mut Vm, text: String) -> Result<CallOutcome, VmError> {
     let written = tokio::task::spawn_blocking(move || {
         let mut out = io::stdout().lock();
@@ -58,7 +58,7 @@ async fn stdout_write(_vm: &mut Vm, text: String) -> Result<CallOutcome, VmError
 }
 
 /// Flushes process stdout and reports whether the flush succeeded.
-#[pd_edge_host_function(name = console_symbols::stdout::FLUSH.name, scope = console)]
+#[pd_host_function(name = console_symbols::stdout::FLUSH.name, scope = console)]
 async fn stdout_flush(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
     tokio::task::spawn_blocking(move || {
         io::stdout()
@@ -72,7 +72,7 @@ async fn stdout_flush(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
 }
 
 /// Writes text to process stderr and returns the number of bytes written.
-#[pd_edge_host_function(name = console_symbols::stderr::WRITE.name, scope = console)]
+#[pd_host_function(name = console_symbols::stderr::WRITE.name, scope = console)]
 async fn stderr_write(_vm: &mut Vm, text: String) -> Result<CallOutcome, VmError> {
     let written = tokio::task::spawn_blocking(move || {
         let mut out = io::stderr().lock();
@@ -89,7 +89,7 @@ async fn stderr_write(_vm: &mut Vm, text: String) -> Result<CallOutcome, VmError
 }
 
 /// Flushes process stderr and reports whether the flush succeeded.
-#[pd_edge_host_function(name = console_symbols::stderr::FLUSH.name, scope = console)]
+#[pd_host_function(name = console_symbols::stderr::FLUSH.name, scope = console)]
 async fn stderr_flush(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
     tokio::task::spawn_blocking(move || {
         io::stderr()
@@ -103,7 +103,7 @@ async fn stderr_flush(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
 }
 
 /// Returns the number of arguments passed to the loaded console program.
-#[pd_edge_host_function(name = console_symbols::args::COUNT.name, scope = console)]
+#[pd_host_function(name = console_symbols::args::COUNT.name, scope = console)]
 fn args_count() -> Result<CallOutcome, VmError> {
     let program_args = current_console_program_args()?;
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(
@@ -112,7 +112,7 @@ fn args_count() -> Result<CallOutcome, VmError> {
 }
 
 /// Returns the argument at the requested zero-based index, or an empty string when it is missing.
-#[pd_edge_host_function(name = console_symbols::args::GET.name, scope = console)]
+#[pd_host_function(name = console_symbols::args::GET.name, scope = console)]
 fn args_get(index: i64) -> Result<CallOutcome, VmError> {
     if index < 0 {
         return Err(VmError::HostError(format!(

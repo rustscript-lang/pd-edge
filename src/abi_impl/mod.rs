@@ -858,7 +858,7 @@ mod tests {
     use edge_abi::symbols::runtime as edge_runtime;
     use edge_abi::symbols::tcp;
     #[cfg(feature = "http")]
-    use pd_edge_host_function::pd_edge_host_function;
+    use pd_host_function::pd_host_function;
     #[cfg(feature = "http")]
     use vm::{BytecodeBuilder, CallOutcome, VmError, VmStatus};
     use vm::{HostImport, OpCode, Program, ValueType, Vm};
@@ -891,7 +891,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     /// Yields a pending TLS test operation.
-    #[pd_edge_host_function(name = "test::yield_pending_tls", scope = http_extension)]
+    #[pd_host_function(name = "test::yield_pending_tls", scope = http_extension)]
     async fn yield_pending_tls(
         _vm: &mut Vm,
         _context: SharedProxyVmContext,
@@ -902,7 +902,7 @@ mod tests {
 
     #[cfg(feature = "http")]
     /// Returns immediately from a scoped HTTP host call while taking Vm.
-    #[pd_edge_host_function(name = "test::sync_return_with_vm", scope = http)]
+    #[pd_host_function(name = "test::sync_return_with_vm", scope = http)]
     fn sync_return_with_vm(_vm: &mut Vm) -> Result<CallOutcome, VmError> {
         Ok(CallOutcome::Return(vm::CallReturn::none()))
     }

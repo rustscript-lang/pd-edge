@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::http::uri::Authority;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use edge_abi::symbols::udp;
-use pd_edge_host_function::pd_edge_host_function;
+use pd_host_function::pd_host_function;
 use tokio::net::{UdpSocket, lookup_host};
 use vm::{CallOutcome, Value, Vm, VmError};
 
@@ -262,14 +262,14 @@ async fn ensure_udp_socket_connected(
 }
 
 /// Allocates a UDP socket handle.
-#[pd_edge_host_function(name = udp::socket::NEW.name, scope = transport)]
+#[pd_host_function(name = udp::socket::NEW.name, scope = transport)]
 async fn socket_new(_vm: &mut Vm, context: SharedProxyVmContext) -> Result<CallOutcome, VmError> {
     let handle = allocate_udp_socket_handle(&context)?;
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(handle))))
 }
 
 /// Returns the UDP socket handle for the current downstream flow.
-#[pd_edge_host_function(name = udp::socket::DOWNSTREAM.name, scope = transport)]
+#[pd_host_function(name = udp::socket::DOWNSTREAM.name, scope = transport)]
 async fn socket_downstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -280,7 +280,7 @@ async fn socket_downstream(
 }
 
 /// Returns the default upstream handle for the UDP socket.
-#[pd_edge_host_function(name = udp::socket::DEFAULT_UPSTREAM.name, scope = transport)]
+#[pd_host_function(name = udp::socket::DEFAULT_UPSTREAM.name, scope = transport)]
 async fn socket_default_upstream(
     _vm: &mut Vm,
     _context: SharedProxyVmContext,
@@ -291,7 +291,7 @@ async fn socket_default_upstream(
 }
 
 /// Returns whether the UDP socket handle is present.
-#[pd_edge_host_function(name = udp::socket::IS_PRESENT.name, scope = transport)]
+#[pd_host_function(name = udp::socket::IS_PRESENT.name, scope = transport)]
 async fn socket_is_present(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -308,7 +308,7 @@ async fn socket_is_present(
 }
 
 /// Binds the UDP socket to a local address.
-#[pd_edge_host_function(name = udp::socket::BIND.name, scope = transport)]
+#[pd_host_function(name = udp::socket::BIND.name, scope = transport)]
 async fn socket_bind(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -325,7 +325,7 @@ async fn socket_bind(
 }
 
 /// Sets the target endpoint for the UDP socket.
-#[pd_edge_host_function(name = udp::socket::SET_TARGET.name, scope = transport)]
+#[pd_host_function(name = udp::socket::SET_TARGET.name, scope = transport)]
 async fn socket_set_target(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -345,7 +345,7 @@ async fn socket_set_target(
 }
 
 /// Attempts to connect the UDP socket.
-#[pd_edge_host_function(name = udp::socket::CONNECT.name, scope = transport)]
+#[pd_host_function(name = udp::socket::CONNECT.name, scope = transport)]
 async fn socket_connect(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -364,7 +364,7 @@ async fn socket_connect(
 }
 
 /// Returns the current phase for the UDP socket.
-#[pd_edge_host_function(name = udp::socket::GET_PHASE.name, scope = transport)]
+#[pd_host_function(name = udp::socket::GET_PHASE.name, scope = transport)]
 async fn socket_get_phase(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -380,7 +380,7 @@ async fn socket_get_phase(
 }
 
 /// Returns the local address for the UDP socket.
-#[pd_edge_host_function(name = udp::socket::GET_LOCAL_ADDR.name, scope = transport)]
+#[pd_host_function(name = udp::socket::GET_LOCAL_ADDR.name, scope = transport)]
 async fn socket_get_local_addr(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -396,7 +396,7 @@ async fn socket_get_local_addr(
 }
 
 /// Returns the peer address for the UDP socket.
-#[pd_edge_host_function(name = udp::socket::GET_PEER_ADDR.name, scope = transport)]
+#[pd_host_function(name = udp::socket::GET_PEER_ADDR.name, scope = transport)]
 async fn socket_get_peer_addr(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -412,7 +412,7 @@ async fn socket_get_peer_addr(
 }
 
 /// Sends a text message over the UDP socket.
-#[pd_edge_host_function(name = udp::socket::SEND_TEXT.name, scope = transport)]
+#[pd_host_function(name = udp::socket::SEND_TEXT.name, scope = transport)]
 async fn socket_send_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -439,7 +439,7 @@ async fn socket_send_text(
 }
 
 /// Receives a text datagram from the UDP socket.
-#[pd_edge_host_function(name = udp::socket::RECV_TEXT.name, scope = transport)]
+#[pd_host_function(name = udp::socket::RECV_TEXT.name, scope = transport)]
 async fn socket_recv_text(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -462,7 +462,7 @@ async fn socket_recv_text(
 }
 
 /// Sends a base64-encoded binary message over the UDP socket.
-#[pd_edge_host_function(name = udp::socket::SEND_BINARY_BASE64.name, scope = transport)]
+#[pd_host_function(name = udp::socket::SEND_BINARY_BASE64.name, scope = transport)]
 async fn socket_send_binary_base64(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -485,7 +485,7 @@ async fn socket_send_binary_base64(
 }
 
 /// Sends a binary message over the UDP socket.
-#[pd_edge_host_function(name = udp::socket::SEND_BINARY.name, scope = transport)]
+#[pd_host_function(name = udp::socket::SEND_BINARY.name, scope = transport)]
 async fn socket_send_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -506,7 +506,7 @@ async fn socket_send_binary(
 }
 
 /// Receives a base64-encoded binary datagram from the UDP socket.
-#[pd_edge_host_function(name = udp::socket::RECV_BINARY_BASE64.name, scope = transport)]
+#[pd_host_function(name = udp::socket::RECV_BINARY_BASE64.name, scope = transport)]
 async fn socket_recv_binary_base64(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -529,7 +529,7 @@ async fn socket_recv_binary_base64(
 }
 
 /// Receives a binary datagram from the UDP socket.
-#[pd_edge_host_function(name = udp::socket::RECV_BINARY.name, scope = transport)]
+#[pd_host_function(name = udp::socket::RECV_BINARY.name, scope = transport)]
 async fn socket_recv_binary(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
@@ -552,7 +552,7 @@ async fn socket_recv_binary(
 }
 
 /// Closes the UDP socket.
-#[pd_edge_host_function(name = udp::socket::CLOSE.name, scope = transport)]
+#[pd_host_function(name = udp::socket::CLOSE.name, scope = transport)]
 async fn socket_close(
     _vm: &mut Vm,
     context: SharedProxyVmContext,
