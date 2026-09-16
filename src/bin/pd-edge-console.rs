@@ -604,7 +604,7 @@ async fn run_loaded_program_once(
     let context: SharedProxyVmContext = Arc::new(context);
     let async_ops = new_shared_vm_async_ops();
     let mut vm = Vm::new_shared(loaded.program.clone());
-    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())));
+    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())))?;
     let mut store = Store::new(
         vm,
         ConsoleVmStoreData::new(context, async_ops, program_args),

@@ -213,7 +213,7 @@ fn set_exchange_target_call(
     let port = parse_upstream_port(port)?;
     let (target_scheme, target_host) = with_exchange_request_mut(&context, exchange, |request| {
         request.set_target_host_port(host, port)?;
-        Ok((request.target_scheme, request.target_host.clone()))
+        Ok::<_, VmError>((request.target_scheme, request.target_host.clone()))
     })??;
 
     if exchange == default_upstream_exchange_handle() {
@@ -246,7 +246,7 @@ fn set_exchange_scheme_call(
     let scheme = HttpUpstreamScheme::parse(scheme)?;
     let (target_scheme, target_host) = with_exchange_request_mut(&context, exchange, |request| {
         request.set_target_scheme(scheme)?;
-        Ok((request.target_scheme, request.target_host.clone()))
+        Ok::<_, VmError>((request.target_scheme, request.target_host.clone()))
     })??;
 
     if target_host.is_some() {
