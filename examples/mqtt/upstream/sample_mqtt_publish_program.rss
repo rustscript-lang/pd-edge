@@ -150,22 +150,26 @@ if header_payload_hex != "" {
 
 if subscribe_filter != "" {
     let event = mqtt::connection::read_event(connection);
-    let kind = if (&event).has("kind") => {
-        (&event)["kind"]
-    } else => {
-        "unknown"
-    };
+    let mut kind: string = "unknown";
+    if (&event).has("kind") {
+        kind = (&event)["kind"];
+    }
     http::response::set_header("x-mqtt-event-kind", kind);
 
+    // The event map is dynamic; read each field into a string-typed local
+    // before handing it to a string-typed host parameter.
     if (&event).has("topic") {
-        http::response::set_header("x-mqtt-event-topic", (&event)["topic"]);
+        let event_topic: string = (&event)["topic"];
+        http::response::set_header("x-mqtt-event-topic", event_topic);
     }
 
     if (&event).has("reason") {
-        http::response::set_header("x-mqtt-event-reason", (&event)["reason"]);
-        http::response::set_body((&event)["reason"]);
+        let event_reason: string = (&event)["reason"];
+        http::response::set_header("x-mqtt-event-reason", event_reason);
+        http::response::set_body(event_reason);
     } else if (&event).has("payload_text") {
-        http::response::set_body((&event)["payload_text"]);
+        let event_payload_text: string = (&event)["payload_text"];
+        http::response::set_body(event_payload_text);
     } else {
         http::response::set_body(kind);
     }
