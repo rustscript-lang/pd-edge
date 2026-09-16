@@ -146,6 +146,27 @@ mod tests {
         assert_eq!(HOST_FUNCTION_COUNT as usize, FUNCTIONS.len());
     }
 
+    /// The checked-in `abi.json` is the full-surface manifest: regenerate it
+    /// from a `--all-features` build of this crate after any ABI change.
+    #[test]
+    fn checked_in_abi_json_matches_the_generated_manifest() {
+        let all_features = cfg!(feature = "console")
+            && cfg!(feature = "http")
+            && cfg!(feature = "http2")
+            && cfg!(feature = "mqtt")
+            && cfg!(feature = "tls")
+            && cfg!(feature = "websocket")
+            && cfg!(feature = "webrtc");
+        if !all_features {
+            return;
+        }
+        assert_eq!(
+            include_str!("../abi.json"),
+            abi_json(),
+            "pd-edge-abi/abi.json is stale; copy the generated edge_abi_manifest.json over it"
+        );
+    }
+
     #[test]
     fn abi_json_contains_declared_functions() {
         let manifest = abi_json();
