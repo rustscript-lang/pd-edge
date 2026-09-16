@@ -38,11 +38,14 @@ pub(crate) fn expand_pd_edge_host_function(
     let wrapper = generate_edge_host_binder(&item, &wrapper_name, &edge_attr)?;
     let static_wrapper =
         generate_scoped_edge_host_static_wrapper(&item, &wrapper_name, &edge_attr, was_async)?;
-    let registration = generate_edge_host_registration(&item, &wrapper_name, &edge_attr, &docs)?;
+    let descriptor_factory =
+        generate_edge_host_descriptor_factory(&item, &wrapper_name, &edge_attr)?;
+    let registration = generate_edge_host_registration(&wrapper_name, &edge_attr)?;
     Ok(quote! {
         #item
         #wrapper
         #static_wrapper
+        #descriptor_factory
         #registration
     })
 }
@@ -735,53 +738,104 @@ fn generate_scoped_edge_host_static_wrapper(
     }
 }
 
-fn generate_edge_host_registration(
+/// Generates the core `HostFunctionDescriptor` factory for an edge host
+/// function.
+///
+/// The factory joins the two halves of the contract: the guest schema is
+/// derived by the runtime from the function's ABI declaration (the single
+/// schema/effect source), and this expansion contributes exactly the runtime
+/// binding — the generated static wrapper and the binding class it
+/// implements. Scoped functions are the discoverable edge module surface;
+/// unscoped functions have no static edge adapter and therefore declare no
+/// descriptor.
+fn generate_edge_host_descriptor_factory(
     item: &ItemFn,
     wrapper_name: &syn::Ident,
     attr: &EdgeHostAttr,
-    docs: &str,
 ) -> Result<proc_macro2::TokenStream, Error> {
-    let Some(scope) = attr.scope else {
+    let Some(_scope) = attr.scope else {
         return Ok(quote!());
     };
-
-    let entry_name = format_ident!("__pd_edge_registration_{}", wrapper_name);
-    let scope_tokens = edge_scope_tokens(scope);
+    let descriptor_name = format_ident!("__pd_edge_descriptor_{}", wrapper_name);
     let static_wrapper_name = format_ident!("__pd_edge_static_{}", wrapper_name);
-    let function_kind = if scoped_wrapper_uses_vm(item) {
-        quote!(crate::abi_impl::registry::EdgeHostRegistrationFunction::StackStatic(#static_wrapper_name))
+    let name_expr = &attr.name;
+    let observed_params = edge_guest_params(item)?;
+    let (binding, adapter) = if scoped_wrapper_uses_vm(item) {
+        (
+            quote!(::vm::host_extension::HostBindingKind::StaticStack),
+            quote!(::vm::host_extension::HostAdapterDescriptor::StaticStack(#static_wrapper_name)),
+        )
     } else {
-        quote!(crate::abi_impl::registry::EdgeHostRegistrationFunction::ArgsStatic(#static_wrapper_name))
+        (
+            quote!(::vm::host_extension::HostBindingKind::StaticArgs),
+            quote!(::vm::host_extension::HostAdapterDescriptor::StaticArgs(#static_wrapper_name)),
+        )
     };
-    let mut arity = 0usize;
+    Ok(quote! {
+        #[allow(dead_code)]
+        fn #descriptor_name() -> ::vm::host_extension::HostFunctionDescriptor {
+            crate::abi_impl::descriptor::edge_function_descriptor(
+                #name_expr,
+                &[#(#observed_params),*],
+                #binding,
+                #adapter,
+            )
+        }
+    })
+}
 
+/// The guest-visible parameter list of an edge host function, in declaration
+/// order.
+///
+/// Only the parameters the guest can pass are listed: the runtime-injected
+/// `Vm`/context/async-op parameters and the `bind(...)` injections are not
+/// guest arguments. The value type is the wire shape the decoder accepts.
+fn edge_guest_params(item: &ItemFn) -> Result<Vec<proc_macro2::TokenStream>, Error> {
+    let mut params = Vec::new();
     for input in &item.sig.inputs {
         let FnArg::Typed(pat_type) = input else {
             return Err(Error::new_spanned(input, "methods are not supported"));
         };
-        if is_vm_context_type(&pat_type.ty)
-            || is_edge_async_ops_type(&pat_type.ty)
-            || is_edge_context_type(&pat_type.ty)
-        {
+        let Pat::Ident(PatIdent { ident, .. }) = pat_type.pat.as_ref() else {
+            return Err(Error::new_spanned(
+                &pat_type.pat,
+                "edge host parameters must use identifier patterns",
+            ));
+        };
+        let ty = &pat_type.ty;
+        if is_vm_context_type(ty) || is_edge_async_ops_type(ty) || is_edge_context_type(ty) {
             continue;
         }
-        if is_value_slice_type(&pat_type.ty) {
-            return Err(Error::new_spanned(
-                &pat_type.ty,
-                "scoped pd_edge_host_function does not support raw args",
-            ));
-        }
-        arity += 1;
+        let value_type = match edge_arg_decoder_kind(ty)? {
+            EdgeArgDecoderKind::String | EdgeArgDecoderKind::StringRef => {
+                quote!(String)
+            }
+            EdgeArgDecoderKind::Int => quote!(Int),
+            EdgeArgDecoderKind::Bool => quote!(Bool),
+            EdgeArgDecoderKind::Value | EdgeArgDecoderKind::ValueRef => quote!(Unknown),
+            EdgeArgDecoderKind::Map | EdgeArgDecoderKind::MapRef => quote!(Map),
+        };
+        let name = LitStr::new(&ident.to_string(), ident.span());
+        params.push(quote!((#name, crate::abi_impl::descriptor::EdgeGuestValueType::#value_type)));
     }
+    Ok(params)
+}
 
-    let arity = u8::try_from(arity).map_err(|_| {
-        Error::new_spanned(
-            &item.sig.ident,
-            "edge host functions must have 255 arguments or fewer",
-        )
-    })?;
-    let name_expr = &attr.name;
-    let docs = docs.to_string();
+/// Registers the function in the edge discovery inventory.
+///
+/// The inventory carries discovery metadata only (scope + descriptor
+/// factory); the name, arity, documentation, and adapter all come from the
+/// descriptor.
+fn generate_edge_host_registration(
+    wrapper_name: &syn::Ident,
+    attr: &EdgeHostAttr,
+) -> Result<proc_macro2::TokenStream, Error> {
+    let Some(scope) = attr.scope else {
+        return Ok(quote!());
+    };
+    let entry_name = format_ident!("__pd_edge_registration_{}", wrapper_name);
+    let scope_tokens = edge_scope_tokens(scope);
+    let descriptor_name = format_ident!("__pd_edge_descriptor_{}", wrapper_name);
 
     Ok(quote! {
         #[::linkme::distributed_slice(crate::abi_impl::registry::PD_EDGE_HOST_FUNCTIONS)]
@@ -789,10 +843,7 @@ fn generate_edge_host_registration(
         static #entry_name: crate::abi_impl::registry::EdgeHostRegistration =
             crate::abi_impl::registry::EdgeHostRegistration {
                 scope: #scope_tokens,
-                name: #name_expr,
-                arity: #arity,
-                docs: #docs,
-                function: #function_kind,
+                descriptor: #descriptor_name,
             };
     })
 }
@@ -1182,5 +1233,147 @@ fn is_value_slice_type(ty: &Type) -> bool {
                 )
         ),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::parse_str;
+
+    fn expand(attr: &str, item: &str) -> String {
+        let args = syn::parse_str::<syn::Meta>(attr)
+            .map(|meta| {
+                let mut list = Punctuated::new();
+                list.push(meta);
+                list
+            })
+            .expect("test attribute should parse");
+        let item: ItemFn = parse_str(item).expect("test function should parse");
+        expand_pd_edge_host_function(args, item)
+            .expect("expansion should succeed")
+            .to_string()
+            .chars()
+            .filter(|ch| !ch.is_whitespace())
+            .collect()
+    }
+
+    fn expand_with_args(attr: &str, item: &str) -> String {
+        let args =
+            syn::parse::Parser::parse_str(Punctuated::<Meta, Token![,]>::parse_terminated, attr)
+                .expect("test attribute should parse");
+        let item: ItemFn = parse_str(item).expect("test function should parse");
+        expand_pd_edge_host_function(args, item)
+            .expect("expansion should succeed")
+            .to_string()
+            .chars()
+            .filter(|ch| !ch.is_whitespace())
+            .collect()
+    }
+
+    #[test]
+    fn async_expansion_normalizes_the_body_result_type() {
+        let expanded = expand_with_args(
+            r#"name = "runtime::sleep", scope = runtime"#,
+            r#"
+            /// Sleeps.
+            async fn runtime_sleep(_vm: &mut ::vm::Vm, ms: i64) -> Result<::vm::CallOutcome, ::vm::VmError> {
+                Ok(::vm::CallOutcome::Return(::vm::CallReturn::none()))
+            }
+            "#,
+        );
+        assert!(
+            expanded
+                .contains("let__pd_edge_body_result:::vm::VmResult<::vm::CallOutcome>=asyncmove"),
+            "the authored body must be awaited into an explicitly typed result: {expanded}"
+        );
+        assert!(
+            !expanded.contains("__pd_edge_outcome=(asyncmove"),
+            "the untyped await inference must be gone: {expanded}"
+        );
+    }
+
+    #[test]
+    fn async_expansion_preserves_a_declared_custom_error_type() {
+        let expanded = expand_with_args(
+            r#"name = "runtime::sleep", scope = runtime"#,
+            r#"
+            /// Sleeps.
+            async fn runtime_sleep(_vm: &mut ::vm::Vm, ms: i64) -> Result<::vm::CallOutcome, ::edge::CustomError> {
+                Ok(::vm::CallOutcome::Return(::vm::CallReturn::none()))
+            }
+            "#,
+        );
+        assert!(
+            expanded.contains("<::edge::CustomError>::from(::vm::VmError::HostError"),
+            "a declared custom error type must be preserved: {expanded}"
+        );
+    }
+
+    #[test]
+    fn scoped_vm_functions_declare_a_static_stack_descriptor() {
+        let expanded = expand_with_args(
+            r#"name = "tcp::stream::get_phase", scope = transport"#,
+            r#"
+            /// Reports the phase.
+            fn stream_get_phase_impl(vm: &mut ::vm::Vm, handle: i64) -> ::vm::CallOutcome {
+                ::vm::CallOutcome::Return(::vm::CallReturn::none())
+            }
+            "#,
+        );
+        assert!(
+            expanded.contains("fn__pd_edge_descriptor_stream_get_phase()->::vm::host_extension::HostFunctionDescriptor{"),
+            "a scoped function must expose one descriptor factory: {expanded}"
+        );
+        assert!(
+            expanded.contains("::vm::host_extension::HostBindingKind::StaticStack,::vm::host_extension::HostAdapterDescriptor::StaticStack(__pd_edge_static_stream_get_phase)"),
+            "the descriptor must carry the stack adapter: {expanded}"
+        );
+        assert!(
+            expanded.contains("descriptor:__pd_edge_descriptor_stream_get_phase"),
+            "the discovery inventory must reference the descriptor: {expanded}"
+        );
+        assert!(
+            !expanded.contains("EdgeHostRegistration{scope:crate::abi_impl::registry::EdgeHostScope::Transport,name:"),
+            "the inventory must not duplicate the guest name: {expanded}"
+        );
+    }
+
+    #[test]
+    fn args_only_scoped_functions_declare_a_static_args_descriptor() {
+        let expanded = expand_with_args(
+            r#"name = "io::exists", scope = io"#,
+            r#"
+            /// Reports existence.
+            fn io_exists(path: &str) -> Result<::vm::CallOutcome, ::vm::VmError> {
+                Ok(::vm::CallOutcome::Return(::vm::CallReturn::none()))
+            }
+            "#,
+        );
+        assert!(
+            expanded.contains("::vm::host_extension::HostBindingKind::StaticArgs,::vm::host_extension::HostAdapterDescriptor::StaticArgs(__pd_edge_static_io_exists)"),
+            "an args-only function must declare the args adapter: {expanded}"
+        );
+    }
+
+    #[test]
+    fn unscoped_functions_declare_no_edge_adapter_or_descriptor() {
+        let expanded = expand(
+            r#"name = "test::unscoped""#,
+            r#"
+            /// Unscoped.
+            fn test_unscoped(vm: &mut ::vm::Vm) -> Result<::vm::CallOutcome, ::vm::VmError> {
+                Ok(::vm::CallOutcome::Return(::vm::CallReturn::none()))
+            }
+            "#,
+        );
+        assert!(
+            !expanded.contains("__pd_edge_descriptor_test_unscoped"),
+            "an unscoped function has no discoverable edge adapter: {expanded}"
+        );
+        assert!(
+            expanded.contains("bind_async_host_handler"),
+            "an unscoped function still binds through its edge binder: {expanded}"
+        );
     }
 }
