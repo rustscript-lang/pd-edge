@@ -322,26 +322,47 @@ fn transform_async_edge_function(item: &mut ItemFn, attr: &EdgeHostAttr) -> Resu
 
     let original_block = item.block.clone();
     let prepare_stmt = async_scope_prepare_stmt(item, attr)?;
+    let error_type = declared_result_error_type(&item.sig.output)?;
     item.sig.asyncness = None;
     *item.block = syn::parse2(quote!({
         crate::abi_impl::schedule_current_future_call(#vm_ident, async move {
             #prepare_stmt
-            let __pd_edge_outcome = (async move #original_block).await?;
+            // One macro-level return-type normalization: the authored body is
+            // awaited into an explicitly typed `VmResult<CallOutcome>`, so the
+            // unannotated `Ok(CallOutcome::...)` returns inside edge host
+            // bodies never need per-call-site annotations.
+            let __pd_edge_body_result: ::vm::VmResult<::vm::CallOutcome> =
+                async move #original_block .await;
+            let __pd_edge_outcome = match __pd_edge_body_result {
+                Ok(outcome) => outcome,
+                Err(error) => return Err(error),
+            };
             match __pd_edge_outcome {
                 ::vm::CallOutcome::Return(values) => Ok(values),
-                ::vm::CallOutcome::Halt => Err(::vm::VmError::HostError(
+                ::vm::CallOutcome::Halt => Err(<#error_type>::from(::vm::VmError::HostError(
                     "async edge host functions must not return Halt".to_string(),
-                )),
-                ::vm::CallOutcome::Yield => Err(::vm::VmError::HostError(
+                ))),
+                ::vm::CallOutcome::Yield => Err(<#error_type>::from(::vm::VmError::HostError(
                     "async edge host functions must not return Yield".to_string(),
-                )),
-                ::vm::CallOutcome::Pending(_) => Err(::vm::VmError::HostError(
+                ))),
+                ::vm::CallOutcome::Pending(_) => Err(<#error_type>::from(::vm::VmError::HostError(
                     "async edge host functions must not return Pending".to_string(),
-                )),
+                ))),
             }
         })
     }))?;
     Ok(())
+}
+
+/// Error type of a declared `Result<CallOutcome, E>` edge host function return.
+fn declared_result_error_type(output: &ReturnType) -> Result<Type, Error> {
+    let ReturnType::Type(_, ty) = output else {
+        return Ok(syn::parse_quote!(::vm::VmError));
+    };
+    match unwrap_result_type_with_error(ty)? {
+        Some((inner, error)) if is_call_outcome_type(&inner) => Ok(error),
+        _ => Ok(syn::parse_quote!(::vm::VmError)),
+    }
 }
 
 fn validate_edge_bind_names(item: &ItemFn, bind_params: &[Ident]) -> Result<(), Error> {
@@ -1035,10 +1056,15 @@ fn edge_output_kind(output: &ReturnType) -> Result<Option<EdgeOutputKind>, Error
 }
 
 fn unwrap_result_type(ty: &Type) -> Result<Option<Type>, Error> {
+    Ok(unwrap_result_type_with_error(ty)?.map(|(ok, _)| ok))
+}
+
+/// Splits a `Result<T, E>` type into its `Ok` and `Err` types.
+fn unwrap_result_type_with_error(ty: &Type) -> Result<Option<(Type, Type)>, Error> {
     match ty {
-        Type::Group(group) => unwrap_result_type(&group.elem),
-        Type::Paren(paren) => unwrap_result_type(&paren.elem),
-        Type::Reference(reference) => unwrap_result_type(&reference.elem),
+        Type::Group(group) => unwrap_result_type_with_error(&group.elem),
+        Type::Paren(paren) => unwrap_result_type_with_error(&paren.elem),
+        Type::Reference(reference) => unwrap_result_type_with_error(&reference.elem),
         Type::Path(path) => {
             let Some(segment) = path.path.segments.last() else {
                 return Ok(None);
@@ -1058,7 +1084,11 @@ fn unwrap_result_type(ty: &Type) -> Result<Option<Type>, Error> {
                     "Result<T, E> requires a return type argument",
                 ));
             };
-            Ok(Some(inner.clone()))
+            let error = match args.args.iter().nth(1) {
+                Some(syn::GenericArgument::Type(error)) => error.clone(),
+                _ => syn::parse_quote!(::vm::VmError),
+            };
+            Ok(Some((inner.clone(), error)))
         }
         _ => Ok(None),
     }

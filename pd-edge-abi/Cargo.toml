@@ -22,7 +22,7 @@ websocket = ["http"]
 webrtc = ["http"]
 
 [dependencies]
-pd-host-function = { path = "../../rustscript/pd-host-function", version = "0.1.0" }
+pd-host-function = { git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", version = "0.1.0" }
 
 [build-dependencies]
 syn = { version = "2", features = ["full"] }

@@ -1,4 +1,5 @@
 use parking_lot::Mutex;
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 use tokio::{
     runtime::Handle,
@@ -341,7 +342,7 @@ fn new_vm_runner_store(
     async_ops: SharedVmAsyncOps,
     jit_enabled: bool,
     drop_contract_events_enabled: bool,
-) -> VmRunnerStore {
+) -> Result<VmRunnerStore, VmExecutionError> {
     let mut vm = Vm::new_shared(program.program.clone());
     vm.set_drop_contract_events_enabled(drop_contract_events_enabled);
     if !jit_enabled {
@@ -349,8 +350,12 @@ fn new_vm_runner_store(
         jit_config.enabled = false;
         vm.set_jit_config(jit_config);
     }
-    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())));
-    Store::new(vm, VmRunnerStoreData::new(vm_context, async_ops))
+    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())))
+        .map_err(VmExecutionError::Vm)?;
+    Ok(Store::new(
+        vm,
+        VmRunnerStoreData::new(vm_context, async_ops),
+    ))
 }
 
 fn register_host_modules_from_store(
@@ -377,7 +382,8 @@ fn acquire_vm_runner_store(
         && let Some(mut vm) = program.vm_pool.take(pool_key)
     {
         vm.set_drop_contract_events_enabled(drop_contract_events_enabled);
-        vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())));
+        vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())))
+            .map_err(VmExecutionError::Vm)?;
         return Ok(AcquiredVmRunnerStore {
             vm_store: Store::new(vm, VmRunnerStoreData::new(vm_context, async_ops)),
             pool_key: Some(pool_key),
@@ -390,15 +396,31 @@ fn acquire_vm_runner_store(
         async_ops,
         jit_enabled,
         drop_contract_events_enabled,
-    );
+    )?;
     register_host_modules_from_store(&mut vm_store, register_host_modules)?;
     Ok(AcquiredVmRunnerStore { vm_store, pool_key })
 }
 
+/// Returns a finished VM to the reuse pool only when it reached clean
+/// quiescence.
+///
+/// The frozen core reports reset failures and can keep the old execution scope
+/// `Closing` until its close boundary is polled. A VM that fails that boundary
+/// (or is still closing after the poll) is dropped instead of pooled, so a
+/// pooled VM is always immediately reusable.
 fn recycle_vm_runner_store(program: &LoadedProgram, pool_key: VmPoolKey, vm_store: VmRunnerStore) {
     let mut vm = vm_store.into_vm();
-    vm.reset_for_reuse();
-    vm.clear_async_bridge();
+    if vm.reset_for_reuse().is_err() {
+        return;
+    }
+    let waker = Waker::noop();
+    let mut cx = Context::from_waker(waker);
+    if !matches!(vm.poll_reset_for_reuse(&mut cx), Poll::Ready(Ok(()))) {
+        return;
+    }
+    if vm.clear_async_bridge().is_err() {
+        return;
+    }
     vm.clear_runtime_print_sink();
     program.vm_pool.put(pool_key, vm);
 }
@@ -611,7 +633,8 @@ mod tests {
             Arc::new(RateLimiterStore::new()),
         ));
         let async_ops = new_shared_vm_async_ops();
-        let store = new_vm_runner_store(&loaded_program, context, async_ops, true, false);
+        let store = new_vm_runner_store(&loaded_program, context, async_ops, true, false)
+            .expect("fresh VM store should be created");
         let epoch_handle = store.vm().epoch_handle();
         let debug = VmDebugInvocation {
             attach_debugger: false,

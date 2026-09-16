@@ -307,7 +307,8 @@ pub(crate) async fn run_edge_program_direct(
 ) -> Result<(), VmError> {
     let async_ops = new_shared_vm_async_ops();
     let mut vm = Vm::new(program);
-    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())));
+    vm.set_async_bridge(Box::new(VmAsyncOpBridge::new(async_ops.clone())))
+        .expect("test VM should accept an async bridge");
     register_http_plane_host_module(&mut vm, context.clone(), async_ops.clone())?;
 
     let mut status = {
