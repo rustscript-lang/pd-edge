@@ -79,12 +79,19 @@ if argc == 0 {
     }
 
     if topic != "" {
-        let use_binary_payload = payload.length >= 4 && payload[0:4] == "hex:";
+        // Each slice takes its own copy: the frozen core's local availability
+        // analysis tracks partial moves per local, and the original `payload`
+        // must stay whole for the text-publish branch below.
+        let payload_length = payload.length;
+        let payload_prefix = payload.copy();
+        let use_binary_payload = payload_length >= 4 && payload_prefix[0:4] == "hex:";
         if use_binary_payload {
+            let payload_tail = payload.copy();
+            let hex_digits = payload_tail[4:payload_length];
             mqtt::connection::publish_binary(
                 connection,
                 topic,
-                bytes::from_hex(payload[4:payload.length]),
+                bytes::from_hex(hex_digits),
                 qos,
                 false
             );
