@@ -18,6 +18,7 @@ use crate::lock_metrics::{self, LockMetricKey, ProfiledMutexGuard};
 
 #[cfg(feature = "console")]
 mod console;
+mod descriptor;
 pub(crate) mod http;
 mod http2;
 mod http3;
@@ -937,13 +938,11 @@ mod tests {
 
     #[test]
     fn edge_registration_docs_are_available() {
-        let entry = PD_EDGE_HOST_FUNCTIONS
-            .iter()
-            .find(|entry| entry.name == edge_runtime::SLEEP.name)
-            .expect("runtime::sleep registration should exist");
+        let descriptor = super::descriptor::edge_function_schema(edge_runtime::SLEEP.name)
+            .expect("runtime::sleep should be declared in the edge ABI");
         assert!(
-            !entry.docs.trim().is_empty(),
-            "expected runtime::sleep edge registration docs to be populated"
+            !descriptor.description.trim().is_empty(),
+            "expected runtime::sleep edge descriptor docs to be populated"
         );
     }
 
@@ -951,10 +950,10 @@ mod tests {
     fn edge_registration_uses_function_doc_comments() {
         let entry = PD_EDGE_HOST_FUNCTIONS
             .iter()
-            .find(|entry| entry.name == tcp::stream::GET_PHASE.name)
+            .find(|entry| (entry.descriptor)().schema.name == tcp::stream::GET_PHASE.name)
             .expect("tcp::stream::get_phase registration should exist");
         assert_eq!(
-            entry.docs,
+            (entry.descriptor)().schema.description,
             "Reports the current lifecycle phase for a TCP stream handle."
         );
     }
