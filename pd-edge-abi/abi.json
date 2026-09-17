@@ -1,5 +1,5 @@
 {
-  "abi_version": 24,
+  "abi_version": 25,
   "functions": [
     { "index": 0, "name": "http::request::get_id", "arity": 0, "params": [], "return_type": "string", "docs": "Host function `http::request::get_id`." },
     { "index": 1, "name": "http::request::get_method", "arity": 0, "params": [], "return_type": "string", "docs": "Host function `http::request::get_method`." },
