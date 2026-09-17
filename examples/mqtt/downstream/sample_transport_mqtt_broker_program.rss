@@ -1,3 +1,4 @@
+use bytes;
 use runtime;
 use tcp;
 use tls;
@@ -24,88 +25,94 @@ use websocket;
 // The broker stores subscription filters for the active session and echoes
 // matching publishes back to that same session as QoS 0 deliveries.
 
-fn append_values(left, right) {
-    let mut out = [];
-    let mut index = 0;
-    while index < left.length {
+fn append_values(left: [int], right: [int]) -> [int] {
+    let mut out: [int] = [];
+    let left_len: int = left.length;
+    let mut index: int = 0;
+    while index < left_len {
         out[out.length] = left[index];
         index = index + 1;
     }
+    let right_len: int = right.length;
     index = 0;
-    while index < right.length {
+    while index < right_len {
         out[out.length] = right[index];
         index = index + 1;
     }
     out
 }
 
-fn take_values(source, start, count) {
-    let mut out = [];
-    let mut index = 0;
-    while index < count && (start + index) < source.length {
+fn take_values(source: [int], start: int, count: int) -> [int] {
+    let mut out: [int] = [];
+    let source_len: int = source.length;
+    let mut index: int = 0;
+    while index < count && (start + index) < source_len {
         out[out.length] = source[start + index];
         index = index + 1;
     }
     out
 }
 
-fn low_7_bits(value) {
+fn low_7_bits(value: int) -> int {
     value % 128
 }
 
-fn has_high_bit(value) {
+fn has_high_bit(value: int) -> bool {
     value >= 128
 }
 
-fn high_byte(value) {
+fn high_byte(value: int) -> int {
     (value / 256) % 256
 }
 
-fn low_byte(value) {
+fn low_byte(value: int) -> int {
     value % 256
 }
 
-fn u16_from_bytes(bytes, offset) {
+fn u16_from_bytes(bytes: [int], offset: int) -> int {
     (bytes[offset] * 256) + bytes[offset + 1]
 }
 
-fn mqtt_qos_from_header(header) {
+fn mqtt_qos_from_header(header: int) -> int {
     (header / 2) % 4
 }
 
-fn mqtt_kind_from_header(header) {
+fn mqtt_kind_from_header(header: int) -> int {
     header / 16
 }
 
-fn exact_read_tcp(stream, want) {
-    let mut out = [];
+fn exact_read_tcp(stream: int, want: int) -> [int] {
+    let mut out: [int] = [];
     while out.length < want {
-        let chunk = tcp::stream::read_binary(stream, want - out.length);
-        if chunk.length == 0 {
+        let remaining: int = want - out.length;
+        let chunk_bytes: bytes = tcp::stream::read_binary(stream, remaining);
+        if chunk_bytes.length == 0 {
             break;
         }
+        let chunk: [int] = bytes::to_array_u8(chunk_bytes);
         out = append_values(out, chunk);
     }
     out
 }
 
-fn read_mqtt_packet_tcp(stream) {
-    let header = exact_read_tcp(stream, 1);
+fn read_mqtt_packet_tcp(stream: int) -> [int] {
+    let header: [int] = exact_read_tcp(stream, 1);
     if header.length != 1 => {
-        []
+        let empty: [int] = [];
+        empty
     } else => {
-        let mut len_bytes = [];
-        let mut remaining = 0;
-        let mut multiplier = 1;
-        let mut complete = false;
+        let mut len_bytes: [int] = [];
+        let mut remaining: int = 0;
+        let mut multiplier: int = 1;
+        let mut complete: bool = false;
 
         while len_bytes.length < 4 && !complete {
-            let next = exact_read_tcp(stream, 1);
+            let next: [int] = exact_read_tcp(stream, 1);
             if next.length != 1 {
                 len_bytes = [];
                 break;
             }
-            let byte = next[0];
+            let byte: int = next[0];
             len_bytes[len_bytes.length] = byte;
             remaining = remaining + (low_7_bits(byte) * multiplier);
             if !has_high_bit(byte) {
@@ -116,11 +123,13 @@ fn read_mqtt_packet_tcp(stream) {
         }
 
         if !complete => {
-            []
+            let empty: [int] = [];
+            empty
         } else => {
-            let body = exact_read_tcp(stream, remaining);
+            let body: [int] = exact_read_tcp(stream, remaining);
             if body.length != remaining => {
-                []
+                let empty: [int] = [];
+                empty
             } else => {
                 append_values(append_values(header, len_bytes), body)
             };
@@ -128,12 +137,12 @@ fn read_mqtt_packet_tcp(stream) {
     }
 }
 
-fn encode_varint(value) {
-    let mut remaining = value;
-    let mut encoded = [];
-    let mut done = false;
+fn encode_varint(value: int) -> [int] {
+    let mut remaining: int = value;
+    let mut encoded: [int] = [];
+    let mut done: bool = false;
     while !done {
-        let mut byte = remaining % 128;
+        let mut byte: int = remaining % 128;
         remaining = remaining / 128;
         if remaining > 0 {
             byte = byte + 128;
@@ -145,14 +154,15 @@ fn encode_varint(value) {
     encoded
 }
 
-fn decode_varint(bytes, start) {
-    let mut value = 0;
-    let mut multiplier = 1;
-    let mut index = start;
-    let mut complete = 0;
+fn decode_varint(bytes: [int], start: int) -> [int] {
+    let mut value: int = 0;
+    let mut multiplier: int = 1;
+    let mut index: int = start;
+    let mut complete: int = 0;
+    let bytes_len: int = bytes.length;
 
-    while index < bytes.length && index < (start + 4) {
-        let byte = bytes[index];
+    while index < bytes_len && index < (start + 4) {
+        let byte: int = bytes[index];
         value = value + (low_7_bits(byte) * multiplier);
         index = index + 1;
         if !has_high_bit(byte) {
@@ -165,41 +175,49 @@ fn decode_varint(bytes, start) {
     [value, index, complete]
 }
 
-fn packet_body(packet) {
-    let info = decode_varint(packet, 1);
+fn packet_body(packet: [int]) -> [int] {
+    let info: [int] = decode_varint(packet.copy(), 1);
     if info[2] == 0 => {
-        []
+        let empty: [int] = [];
+        empty
     } else => {
-        let body_start = info[1];
-        take_values(packet, body_start, packet.length - body_start)
+        let body_start: int = info[1];
+        let packet_len: int = packet.length;
+        take_values(packet, body_start, packet_len - body_start)
     }
 }
 
-fn decode_utf8_field_bytes(bytes, offset) {
-    if offset + 2 > bytes.length => {
-        [[], -1]
+fn decode_utf8_field_bytes(bytes: [int], offset: int) {
+    let bytes_len: int = bytes.length;
+    if offset + 2 > bytes_len => {
+        let empty: [int] = [];
+        [empty, -1]
     } else => {
-        let len = u16_from_bytes(bytes, offset);
-        let start = offset + 2;
-        if start + len > bytes.length => {
-            [[], -1]
+        let len: int = u16_from_bytes(bytes.copy(), offset);
+        let start: int = offset + 2;
+        if start + len > bytes_len => {
+            let empty: [int] = [];
+            [empty, -1]
         } else => {
             [take_values(bytes, start, len), start + len]
         };
     }
 }
 
-fn encode_utf8_field_bytes(bytes) {
-    append_values([high_byte(bytes.length), low_byte(bytes.length)], bytes)
+fn encode_utf8_field_bytes(bytes: [int]) -> [int] {
+    let bytes_len: int = bytes.length;
+    append_values([high_byte(bytes_len), low_byte(bytes_len)], bytes)
 }
 
-fn bytes_equal(left, right) {
-    if left.length != right.length => {
+fn bytes_equal(left: [int], right: [int]) -> bool {
+    let left_len: int = left.length;
+    let right_len: int = right.length;
+    if left_len != right_len => {
         false
     } else => {
-        let mut index = 0;
-        let mut same = true;
-        while index < left.length {
+        let mut index: int = 0;
+        let mut same: bool = true;
+        while index < left_len {
             if left[index] != right[index] {
                 same = false;
                 break;
@@ -210,55 +228,63 @@ fn bytes_equal(left, right) {
     }
 }
 
-fn parse_subscribe(packet) {
-    let body = packet_body(packet);
+fn parse_subscribe(packet: [int]) {
+    let body: [int] = packet_body(packet);
     if body.length < 3 => {
-        [-1, [], []]
+        let empty_filters: [[int]] = [];
+        let empty_qoses: [int] = [];
+        [-1, empty_filters, empty_qoses]
     } else => {
-        let packet_id = u16_from_bytes(body, 0);
-        let props = decode_varint(body, 2);
-        let prop_len = props[0];
-        let mut cursor = props[1] + prop_len;
-        let mut filters = [];
-        let mut qoses = [];
-        let mut valid = props[2] == 1 && cursor <= body.length;
+        let packet_id: int = u16_from_bytes(body.copy(), 0);
+        let props: [int] = decode_varint(body.copy(), 2);
+        let prop_len: int = props[0];
+        let mut cursor: int = props[1] + prop_len;
+        let mut filters: [[int]] = [];
+        let mut qoses: [int] = [];
+        let body_len: int = body.length;
+        let mut valid: bool = props[2] == 1 && cursor <= body_len;
 
-        while valid && cursor < body.length {
-            let field = decode_utf8_field_bytes(body, cursor);
-            let filter = field[0];
+        while valid && cursor < body_len {
+            let field = decode_utf8_field_bytes(body.copy(), cursor);
+            let filter: [int] = field[0];
             cursor = field[1];
-            if cursor < 0 || cursor >= body.length {
+            if cursor < 0 || cursor >= body_len {
                 valid = false;
                 break;
             }
+            let qos_source: [int] = body.copy();
             filters[filters.length] = filter;
-            qoses[qoses.length] = body[cursor] % 4;
+            qoses[qoses.length] = qos_source[cursor] % 4;
             cursor = cursor + 1;
         }
 
         if !valid || filters.length == 0 => {
-            [-1, [], []]
+            let empty_filters: [[int]] = [];
+            let empty_qoses: [int] = [];
+            [-1, empty_filters, empty_qoses]
         } else => {
             [packet_id, filters, qoses]
         };
     }
 }
 
-fn parse_unsubscribe(packet) {
-    let body = packet_body(packet);
+fn parse_unsubscribe(packet: [int]) {
+    let body: [int] = packet_body(packet);
     if body.length < 3 => {
-        [-1, []]
+        let empty_filters: [[int]] = [];
+        [-1, empty_filters]
     } else => {
-        let packet_id = u16_from_bytes(body, 0);
-        let props = decode_varint(body, 2);
-        let prop_len = props[0];
-        let mut cursor = props[1] + prop_len;
-        let mut filters = [];
-        let mut valid = props[2] == 1 && cursor <= body.length;
+        let packet_id: int = u16_from_bytes(body.copy(), 0);
+        let props: [int] = decode_varint(body.copy(), 2);
+        let prop_len: int = props[0];
+        let mut cursor: int = props[1] + prop_len;
+        let mut filters: [[int]] = [];
+        let body_len: int = body.length;
+        let mut valid: bool = props[2] == 1 && cursor <= body_len;
 
-        while valid && cursor < body.length {
-            let field = decode_utf8_field_bytes(body, cursor);
-            let filter = field[0];
+        while valid && cursor < body_len {
+            let field = decode_utf8_field_bytes(body.copy(), cursor);
+            let filter: [int] = field[0];
             cursor = field[1];
             if cursor < 0 {
                 valid = false;
@@ -268,49 +294,64 @@ fn parse_unsubscribe(packet) {
         }
 
         if !valid || filters.length == 0 => {
-            [-1, []]
+            let empty_filters: [[int]] = [];
+            [-1, empty_filters]
         } else => {
             [packet_id, filters]
         };
     }
 }
 
-fn parse_publish(packet) {
-    if packet.length == 0 => {
-        [[], [], -1, -1]
+fn parse_publish(packet: [int]) {
+    let packet_len: int = packet.length;
+    if packet_len == 0 => {
+        let empty_topic: [int] = [];
+        let empty_payload: [int] = [];
+        [empty_topic, empty_payload, -1, -1]
     } else => {
-        let header = packet[0];
-        let qos = mqtt_qos_from_header(header);
-        let body = packet_body(packet);
-        let topic_field = decode_utf8_field_bytes(body, 0);
-        let topic = topic_field[0];
-        let mut cursor = topic_field[1];
-        let mut packet_id = -1;
+        let header_source: [int] = packet.copy();
+        let header: int = header_source[0];
+        let qos: int = mqtt_qos_from_header(header);
+        let body: [int] = packet_body(packet);
+        let body_len: int = body.length;
+        let topic_field = decode_utf8_field_bytes(body.copy(), 0);
+        let topic: [int] = topic_field[0];
+        let mut cursor: int = topic_field[1];
+        let mut packet_id: int = -1;
 
         if cursor < 0 => {
-            [[], [], -1, -1]
+            let empty_topic: [int] = [];
+            let empty_payload: [int] = [];
+            [empty_topic, empty_payload, -1, -1]
         } else => {
             if qos > 0 {
-                if cursor + 2 > body.length {
+                if cursor + 2 > body_len {
                     cursor = -1;
                 } else {
-                    packet_id = u16_from_bytes(body, cursor);
+                    packet_id = u16_from_bytes(body.copy(), cursor);
                     cursor = cursor + 2;
                 }
             }
 
             if cursor < 0 => {
-                [[], [], -1, -1]
+                let empty_topic: [int] = [];
+                let empty_payload: [int] = [];
+                [empty_topic, empty_payload, -1, -1]
             } else => {
-                let props = decode_varint(body, cursor);
+                let props: [int] = decode_varint(body.copy(), cursor);
                 if props[2] == 0 => {
-                    [[], [], -1, -1]
+                    let empty_topic: [int] = [];
+                    let empty_payload: [int] = [];
+                    [empty_topic, empty_payload, -1, -1]
                 } else => {
                     cursor = props[1] + props[0];
-                    if cursor > body.length => {
-                        [[], [], -1, -1]
+                    if cursor > body_len => {
+                        let empty_topic: [int] = [];
+                        let empty_payload: [int] = [];
+                        [empty_topic, empty_payload, -1, -1]
                     } else => {
-                        [topic, take_values(body, cursor, body.length - cursor), qos, packet_id]
+                        let payload_len: int = body_len - cursor;
+                        [topic, take_values(body, cursor, payload_len), qos, packet_id]
                     };
                 };
             };
@@ -318,65 +359,67 @@ fn parse_publish(packet) {
     }
 }
 
-fn build_suback(packet_id, qoses) {
-    let mut body = [high_byte(packet_id), low_byte(packet_id), 0];
+fn build_suback(packet_id: int, qoses: [int]) -> [int] {
+    let mut body: [int] = [high_byte(packet_id), low_byte(packet_id), 0];
     body = append_values(body, qoses);
-    let mut packet = [144];
+    let mut packet: [int] = [144];
     packet = append_values(packet, encode_varint(body.length));
     append_values(packet, body)
 }
 
-fn build_unsuback(packet_id, filter_count) {
-    let mut reasons = [];
-    let mut index = 0;
+fn build_unsuback(packet_id: int, filter_count: int) -> [int] {
+    let mut reasons: [int] = [];
+    let mut index: int = 0;
     while index < filter_count {
         reasons[reasons.length] = 0;
         index = index + 1;
     }
-    let mut body = [high_byte(packet_id), low_byte(packet_id), 0];
+    let mut body: [int] = [high_byte(packet_id), low_byte(packet_id), 0];
     body = append_values(body, reasons);
-    let mut packet = [176];
+    let mut packet: [int] = [176];
     packet = append_values(packet, encode_varint(body.length));
     append_values(packet, body)
 }
 
-fn build_puback(packet_id) {
+fn build_puback(packet_id: int) -> [int] {
     [64, 4, high_byte(packet_id), low_byte(packet_id), 0, 0]
 }
 
-fn build_publish(topic, payload) {
-    let mut body = encode_utf8_field_bytes(topic);
+fn build_publish(topic: [int], payload: [int]) -> [int] {
+    let mut body: [int] = encode_utf8_field_bytes(topic);
     body = append_values(body, [0]);
     body = append_values(body, payload);
-    let mut packet = [48];
+    let mut packet: [int] = [48];
     packet = append_values(packet, encode_varint(body.length));
     append_values(packet, body)
 }
 
-fn topic_matches(filter, topic) {
-    let mut filter_index = 0;
-    let mut topic_index = 0;
-    let mut matched = true;
-    let mut done = false;
+fn topic_matches(filter: [int], topic: [int]) -> bool {
+    let mut filter_index: int = 0;
+    let mut topic_index: int = 0;
+    let mut matched: bool = true;
+    let mut done: bool = false;
+    let filter_len: int = filter.length;
+    let topic_len: int = topic.length;
 
-    while filter_index < filter.length && !done {
-        let byte = filter[filter_index];
+    while filter_index < filter_len && !done {
+        let byte: int = filter[filter_index];
 
         if byte == 35 {
-            matched = filter_index == filter.length - 1;
+            matched = filter_index == filter_len - 1;
             done = true;
         } else if byte == 43 {
-            while topic_index < topic.length && topic[topic_index] != 47 {
+            while topic_index < topic_len && topic[topic_index] != 47 {
                 topic_index = topic_index + 1;
             }
             filter_index = filter_index + 1;
-            if filter_index == filter.length {
-                matched = topic_index == topic.length;
+            if filter_index == filter_len {
+                matched = topic_index == topic_len;
                 done = true;
             } else if filter[filter_index] != 47 {
                 matched = false;
                 done = true;
-            } else if topic_index >= topic.length || topic[topic_index] != 47 {
+            } else if topic_index >= topic_len || topic[topic_index] != 47 {
                 matched = false;
                 done = true;
             } else {
@@ -384,7 +427,7 @@ fn topic_matches(filter, topic) {
                 topic_index = topic_index + 1;
             }
         } else {
-            if topic_index >= topic.length || topic[topic_index] != byte {
+            if topic_index >= topic_len || topic[topic_index] != byte {
                 matched = false;
                 done = true;
             } else {
@@ -394,14 +437,15 @@ fn topic_matches(filter, topic) {
         }
     }
 
-    matched && topic_index == topic.length
+    matched && topic_index == topic_len
 }
 
-fn any_subscription_matches(subscriptions, topic) {
-    let mut index = 0;
-    let mut matched = false;
+fn any_subscription_matches(subscriptions: [[int]], topic: [int]) -> bool {
+    let mut index: int = 0;
+    let mut matched: bool = false;
     while index < subscriptions.length {
-        if topic_matches(subscriptions[index], topic) {
+        let filter: [int] = subscriptions[index].copy();
+        if topic_matches(filter, topic.copy()) {
             matched = true;
             break;
         }
@@ -410,58 +454,61 @@ fn any_subscription_matches(subscriptions, topic) {
     matched
 }
 
-fn remove_subscriptions(subscriptions, removals) {
-    let mut kept = [];
-    let mut outer = 0;
+fn remove_subscriptions(subscriptions: [[int]], removals: [[int]]) -> [[int]] {
+    let mut kept: [[int]] = [];
+    let mut outer: int = 0;
     while outer < subscriptions.length {
-        let mut remove = false;
-        let mut inner = 0;
+        let current: [int] = subscriptions[outer].copy();
+        let mut remove: bool = false;
+        let mut inner: int = 0;
         while inner < removals.length {
-            if bytes_equal(subscriptions[outer], removals[inner]) {
+            let candidate: [int] = removals[inner].copy();
+            if bytes_equal(current.copy(), candidate) {
                 remove = true;
                 break;
             }
             inner = inner + 1;
         }
         if !remove {
-            kept[kept.length] = subscriptions[outer];
+            kept[kept.length] = current;
         }
         outer = outer + 1;
     }
     kept
 }
 
-fn handle_mqtt_packet(packet, subscriptions) {
-    let mut next_subscriptions = subscriptions;
-    let mut responses = [];
-    let mut close = 0;
+fn handle_mqtt_packet(packet: [int], subscriptions: [[int]]) {
+    let mut next_subscriptions: [[int]] = subscriptions;
+    let mut responses: [[int]] = [];
+    let mut close: int = 0;
 
     if packet.length == 0 {
         close = 1;
     } else {
-        let kind = mqtt_kind_from_header(packet[0]);
+        let header_source: [int] = packet.copy();
+        let kind: int = mqtt_kind_from_header(header_source[0]);
 
         if kind == 1 {
             responses[responses.length] = [32, 3, 0, 0, 0];
         } else if kind == 8 {
-            let parsed = parse_subscribe(packet);
-            let packet_id = parsed[0];
-            let filters = parsed[1];
-            let qoses = parsed[2];
+            let parsed = parse_subscribe(packet.copy());
+            let packet_id: int = parsed[0];
+            let filters: [[int]] = parsed[1];
+            let qoses: [int] = parsed[2];
             if packet_id < 0 {
                 close = 1;
             } else {
-                let mut index = 0;
+                let mut index: int = 0;
                 while index < filters.length {
-                    next_subscriptions[next_subscriptions.length] = filters[index];
+                    next_subscriptions[next_subscriptions.length] = filters[index].copy();
                     index = index + 1;
                 }
                 responses[responses.length] = build_suback(packet_id, qoses);
             }
         } else if kind == 10 {
-            let parsed = parse_unsubscribe(packet);
-            let packet_id = parsed[0];
-            let filters = parsed[1];
+            let parsed = parse_unsubscribe(packet.copy());
+            let packet_id: int = parsed[0];
+            let filters: [[int]] = parsed[1];
             if packet_id < 0 {
                 close = 1;
             } else {
@@ -469,18 +516,18 @@ fn handle_mqtt_packet(packet, subscriptions) {
                 responses[responses.length] = build_unsuback(packet_id, filters.length);
             }
         } else if kind == 3 {
-            let parsed = parse_publish(packet);
-            let topic = parsed[0];
-            let payload = parsed[1];
-            let qos = parsed[2];
-            let packet_id = parsed[3];
+            let parsed = parse_publish(packet.copy());
+            let topic: [int] = parsed[0];
+            let payload: [int] = parsed[1];
+            let qos: int = parsed[2];
+            let packet_id: int = parsed[3];
             if qos < 0 || qos > 1 {
                 close = 1;
             } else {
                 if qos == 1 && packet_id >= 0 {
                     responses[responses.length] = build_puback(packet_id);
                 }
-                if any_subscription_matches(next_subscriptions, topic) {
+                if any_subscription_matches(next_subscriptions, topic.copy()) {
                     responses[responses.length] = build_publish(topic, payload);
                 }
             }
@@ -496,24 +543,26 @@ fn handle_mqtt_packet(packet, subscriptions) {
     [next_subscriptions, responses, close]
 }
 
-fn broker_tcp(downstream) {
-    let mut subscriptions = [];
+fn broker_tcp(downstream: int) -> int {
+    let mut subscriptions: [[int]] = [];
 
     while !tcp::stream::eof(downstream) {
-        let packet = read_mqtt_packet_tcp(downstream);
+        let packet: [int] = read_mqtt_packet_tcp(downstream);
         if packet.length == 0 {
             break;
         }
 
         let action = handle_mqtt_packet(packet, subscriptions);
         subscriptions = action[0];
-        let responses = action[1];
-        let mut index = 0;
+        let responses: [[int]] = action[1];
+        let mut index: int = 0;
         while index < responses.length {
-            tcp::stream::write_binary(downstream, responses[index]);
+            let response: [int] = responses[index].copy();
+            tcp::stream::write_binary(downstream, bytes::from_array_u8(response));
             index = index + 1;
         }
-        if action[2] != 0 {
+        let close: int = action[2];
+        if close != 0 {
             break;
         }
     }
@@ -522,24 +571,27 @@ fn broker_tcp(downstream) {
     0
 }
 
-fn broker_websocket(connection) {
-    let mut subscriptions = [];
+fn broker_websocket(connection: int) -> int {
+    let mut subscriptions: [[int]] = [];
 
     while !websocket::connection::eof(connection) {
-        let packet = websocket::connection::read_binary(connection);
-        if packet.length == 0 {
+        let packet_bytes: bytes = websocket::connection::read_binary(connection);
+        if packet_bytes.length == 0 {
             break;
         }
+        let packet: [int] = bytes::to_array_u8(packet_bytes);
 
         let action = handle_mqtt_packet(packet, subscriptions);
         subscriptions = action[0];
-        let responses = action[1];
-        let mut index = 0;
+        let responses: [[int]] = action[1];
+        let mut index: int = 0;
         while index < responses.length {
-            websocket::connection::send_binary(connection, responses[index]);
+            let response: [int] = responses[index].copy();
+            websocket::connection::send_binary(connection, bytes::from_array_u8(response));
             index = index + 1;
         }
-        if action[2] != 0 {
+        let close: int = action[2];
+        if close != 0 {
             break;
         }
     }
@@ -550,32 +602,36 @@ fn broker_websocket(connection) {
     0
 }
 
-fn looks_like_tls_client_hello(prefix) {
-    prefix.length >= 3 && prefix[0] == 22 && prefix[1] == 3
+fn looks_like_tls_client_hello(prefix: [int]) -> bool {
+    let prefix_len: int = prefix.length;
+    prefix_len >= 3 && prefix[0] == 22 && prefix[1] == 3
 }
 
-fn looks_like_http_get(prefix) {
-    prefix.length >= 4 &&
+fn looks_like_http_get(prefix: [int]) -> bool {
+    let prefix_len: int = prefix.length;
+    prefix_len >= 4 &&
         prefix[0] == 71 &&
         prefix[1] == 69 &&
         prefix[2] == 84 &&
         prefix[3] == 32
 }
 
-let downstream = tcp::stream::downstream();
-let initial_prefix = tcp::stream::peek_binary(downstream, 3);
+let downstream: int = tcp::stream::downstream();
+let initial_prefix_bytes: bytes = tcp::stream::peek_binary(downstream, 3);
+let initial_prefix: [int] = bytes::to_array_u8(initial_prefix_bytes);
 
 if looks_like_tls_client_hello(initial_prefix) {
-    let session = tls::session::from_socket(downstream);
+    let session: int = tls::session::from_socket(downstream);
     if !tls::session::handshake(session) {
         tcp::stream::close(downstream);
         runtime::exit();
     }
 }
 
-let plaintext_prefix = tcp::stream::peek_binary(downstream, 4);
+let plaintext_prefix_bytes: bytes = tcp::stream::peek_binary(downstream, 4);
+let plaintext_prefix: [int] = bytes::to_array_u8(plaintext_prefix_bytes);
 if looks_like_http_get(plaintext_prefix) {
-    let connection = websocket::connection::downstream();
+    let connection: int = websocket::connection::downstream();
     websocket::connection::set_subprotocols(connection, "mqtt");
     websocket::connection::connect(connection);
     broker_websocket(connection);

@@ -24,8 +24,9 @@ pub(crate) use edge::{
     ActiveControlPlaneConfig, CommandResultPayload, ControlPlaneCommand, EdgeCommandResult,
     EdgePollRequest, EdgePollResponse, ProxyVmContext, RateLimiterStore, SharedState,
     VmAsyncOpBridge, build_admin_app, build_http_proxy_app, compile_edge_source_file,
-    enter_edge_host_context, new_shared_vm_async_ops, register_http_plane_host_module,
-    serve_http_proxy, serve_https_proxy, serve_transport_proxy, spawn_active_control_plane_client,
+    compile_edge_source_with_flavor, enter_edge_host_context, new_shared_vm_async_ops,
+    register_http_plane_host_module, serve_http_proxy, serve_https_proxy, serve_transport_proxy,
+    spawn_active_control_plane_client,
 };
 #[cfg(feature = "websocket")]
 pub(crate) use futures_util::{SinkExt, StreamExt};
@@ -47,7 +48,11 @@ pub(crate) use tokio_tungstenite::{
         http::HeaderValue as WsHeaderValue,
     },
 };
-pub(crate) use vm::{Program, Vm, VmError, VmStatus, compile_source, encode_program};
+pub(crate) use vm::{Program, SourcePathError, Vm, VmError, VmStatus, encode_program};
+
+pub(crate) fn compile_source(source: &str) -> Result<vm::CompiledProgram, SourcePathError> {
+    compile_edge_source_with_flavor(source, vm::SourceFlavor::RustScript)
+}
 
 pub(crate) const SAMPLE_PROXY_UPSTREAM_PORT: u16 = 18080;
 pub(crate) const SAMPLE_REQUEST_TRANSFORM_UPSTREAM_PORT: u16 = 18081;

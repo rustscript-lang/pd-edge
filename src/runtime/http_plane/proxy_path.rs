@@ -1398,16 +1398,18 @@ mod tests {
     use axum::http::Version;
     #[cfg(feature = "http2")]
     use http_body_util::{BodyExt, Full};
-    use vm::{compile_source, encode_program};
+    use vm::encode_program;
 
     #[cfg(feature = "http2")]
     use crate::abi_impl::Http2SessionFrontier;
+    use crate::compile_edge_source_with_flavor;
     use crate::runtime::{
         LoadedProgram, VmExecutionConfig, VmExecutionMode, apply_program_from_bytes,
     };
 
     fn loaded_program_from_source(source: &str) -> LoadedProgram {
-        let compiled = compile_source(source).expect("source should compile");
+        let compiled = compile_edge_source_with_flavor(source, vm::SourceFlavor::RustScript)
+            .expect("source should compile");
         LoadedProgram {
             program: Arc::new(compiled.program.with_local_count(compiled.locals)),
             vm_pool: Arc::new(crate::runtime::vm_runner::LoadedProgramVmPool::new()),
@@ -1472,7 +1474,8 @@ mod tests {
             runtime::sleep(50);
             http::response::set_body(http::request::get_path());
         "#;
-        let compiled = compile_source(source).expect("source should compile");
+        let compiled = compile_edge_source_with_flavor(source, vm::SourceFlavor::RustScript)
+            .expect("source should compile");
         let program = encode_program(&compiled.program).expect("program should encode");
         let report = apply_program_from_bytes(&state, &program).await;
         assert!(report.applied, "program should apply");
@@ -1650,7 +1653,8 @@ mod tests {
             upstream_host = upstream_addr.ip(),
             upstream_port = upstream_addr.port(),
         );
-        let compiled = compile_source(&source).expect("source should compile");
+        let compiled = compile_edge_source_with_flavor(&source, vm::SourceFlavor::RustScript)
+            .expect("source should compile");
         let program = encode_program(&compiled.program).expect("program should encode");
         let report = apply_program_from_bytes(&state, &program).await;
         assert!(report.applied, "program should apply");

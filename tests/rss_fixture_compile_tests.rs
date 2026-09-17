@@ -67,27 +67,6 @@ fn required_features(path: &Path) -> &'static [&'static str] {
     }
 }
 
-/// Fixtures that the frozen core still rejects for guest-language reasons.
-///
-/// These are *executable samples* outside the compiled CI fixture set. They are
-/// pinned here (with the exact frozen-core diagnostic family) so the sweep
-/// fails if they start compiling — the entry must then be removed — and
-/// everything else must compile. Re-typing them is a guest-program change that
-/// belongs to the sample itself, not to this migration.
-fn expected_frozen_core_incompatibility(path: &Path) -> Option<&'static str> {
-    let relative = path
-        .strip_prefix(PathBuf::from(env!("CARGO_MANIFEST_DIR")))
-        .unwrap_or(path);
-    let text = relative.to_string_lossy().replace('\\', "/");
-    match text.as_str() {
-        "examples/mqtt/downstream/sample_transport_mqtt_broker_program.rss" => Some(
-            "the frozen core's stricter guest inference rejects the hand-written dynamic \
-             MQTT packet decoder (BinaryOperandTypeMismatch: int vs unknown)",
-        ),
-        _ => None,
-    }
-}
-
 fn feature_enabled(feature: &str) -> bool {
     match feature {
         "console" => cfg!(feature = "console"),
@@ -118,7 +97,6 @@ fn every_checked_in_rss_program_compiles_for_its_feature_set() {
     assert!(!files.is_empty(), "the RSS corpus must not be empty");
     let mut compiled = Vec::new();
     let mut skipped = Vec::new();
-    let mut documented = Vec::new();
     let mut failures = Vec::new();
     for path in &files {
         let missing = required_features(path)
@@ -131,23 +109,8 @@ fn every_checked_in_rss_program_compiles_for_its_feature_set() {
             continue;
         }
         match compile_edge_source_file(path) {
-            Ok(_) => {
-                if let Some(reason) = expected_frozen_core_incompatibility(path) {
-                    failures.push(format!(
-                        "{} now compiles; remove its documented frozen-core incompatibility                          entry ({reason})",
-                        path.display()
-                    ));
-                    continue;
-                }
-                compiled.push(path.clone());
-            }
-            Err(error) => {
-                if let Some(reason) = expected_frozen_core_incompatibility(path) {
-                    documented.push(format!("{}: {reason}", path.display()));
-                    continue;
-                }
-                failures.push(format!("{}: {error:?}", path.display()));
-            }
+            Ok(_) => compiled.push(path.clone()),
+            Err(error) => failures.push(format!("{}: {error:?}", path.display())),
         }
     }
     assert!(
@@ -156,21 +119,19 @@ fn every_checked_in_rss_program_compiles_for_its_feature_set() {
         failures.join("\n\n")
     );
     assert_eq!(
-        compiled.len() + skipped.len() + documented.len(),
+        compiled.len() + skipped.len(),
         files.len(),
-        "every fixture must be compiled, skipped for a disabled feature, or documented"
+        "every fixture must be compiled or skipped for a disabled feature; no accepted errors"
     );
     assert!(
         !compiled.is_empty(),
         "at least the default-feature fixtures must compile; skipped={skipped:#?}"
     );
     println!(
-        "compiled {} of {} RSS fixtures ({} skipped for disabled features, {} documented \
-         frozen-core incompatibilities)",
+        "compiled {} of {} RSS fixtures ({} skipped for disabled features)",
         compiled.len(),
         files.len(),
-        skipped.len(),
-        documented.len()
+        skipped.len()
     );
 }
 
