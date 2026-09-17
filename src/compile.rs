@@ -6,6 +6,7 @@ use vm::{
 };
 
 fn with_edge_stdlib_overrides(mut options: CompileSourceFileOptions) -> CompileSourceFileOptions {
+    options.set_host_api_catalog(crate::abi_impl::edge_abi_catalog_arc());
     options.set_module_override_source(
         "edge/http/upstream/request.rss",
         include_str!("../stdlib/rss/http/upstream/request.rss"),
