@@ -26,11 +26,13 @@ name = "edge"
 
 [features]
 # Keep HTTP/3 opt-in in normal builds; release.yml enables it explicitly with --all-features.
+# Do not enable `vm/edge-abi`: frozen pd-vm's optional edge-abi depends on
+# crates.io pd-edge-abi 0.1.1 (ABI24). HTTP compiles and runs against the
+# in-tree ABI25 catalog, exact compiler overlay, and runtime descriptors.
 default = ["console", "http", "tls", "websocket"]
-edge-abi = ["vm/edge-abi"]
 console = ["http", "tls", "websocket", "edge_abi/console"]
 native-jit = ["vm/cranelift-jit"]
-http = ["edge-abi", "edge_abi/http"]
+http = ["edge_abi/http"]
 http2 = ["http", "edge_abi/http2", "dep:h2", "dep:tokio-rustls", "dep:webpki-roots", "dep:rustls-pemfile"]
 http3 = ["http", "dep:quinn", "dep:h3", "dep:h3-quinn", "dep:webpki-roots", "dep:rustls-pemfile", "dep:rcgen"]
 mqtt = ["tls", "edge_abi/mqtt"]
