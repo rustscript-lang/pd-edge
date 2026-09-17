@@ -19,55 +19,55 @@
 //! #[pd_edge_host_function] adapter     ---/    (schema + binding + adapter)
 //! ```
 //!
-//! ## Intentional dynamic boundaries (do not "fix" these)
+//! Closed records are overlayed as [`HostTypeSchema::Named`] on the compiler
+//! catalog. Runtime values remain maps. That overlay changes the catalog
+//! fingerprint tag, so it is an explicit ABI-versioned change (version 25).
 //!
-//! The edge ABI is a published wire contract (ABI version 24, shared with the
-//! `pd-edge-abi` crate the VM compiler links). Its parameter and return types
-//! are the ABI's coarse wire types, and several are *intentionally* dynamic:
+//! ## Intentional dynamic boundaries (allowlisted)
 //!
-//! - `AbiParamType::Any` / `AbiValueType::Unknown` -> [`HostTypeSchema::Unknown`]:
-//!   polymorphic payloads (`http::request::get_header` values, exchange
-//!   bodies, proxy callbacks) whose shape is chosen by the guest program.
-//! - `AbiParamType::Map` / `AbiValueType::Map` -> `Map(Unknown)`; `Array` ->
-//!   `Array(Unknown)`: header dictionaries, JSON bodies, and payload batches
-//!   whose keys are genuinely open-ended.
+//! Open collections stay dynamic, each family documented individually:
 //!
-//! Fixed-shape records in the edge ABI (HTTP head records, TLS handshake
-//! records, WebSocket/MQTT/WebRTC connection records, transport handle
-//! records) travel as maps of documented fields on this wire, so they stay
-//! `Map(Unknown)` here: the wire shape *is* the guest contract, and re-typing
-//! it in the descriptor alone would fork the contract from what the VM
-//! compiler sees. Their field sets are documented next to the runtime readers
-//! in `src/abi_impl/**` and in `docs/EDGE_HOST_DESCRIPTOR_MIGRATION.md`.
+//! - HTTP request header maps (`http::request::get_headers`)
+//! - HTTP request query-argument maps (`http::request::get_query_args`)
+//! - HTTP response header maps (`http::response::get_headers`)
+//! - HTTP response trailer maps (`http::response::get_trailers`)
+//! - HTTP exchange header maps (`http::exchange::get_headers`)
+//! - HTTP exchange trailer maps (`http::exchange::get_trailers`)
+//! - HTTP header-batch `any` parameters (`http::response::set_headers`,
+//!   `http::response::apply_exchange_with_headers`,
+//!   `http::exchange::prepare_default_upstream`)
+//!
+//! WebRTC has no map/any wire types. MQTT `read_event` is a closed
+//! three-variant record and is typed as named `MqttEvent`.
 //!
 //! ## Raw handle-token boundaries
 //!
-//! Edge host handles (exchange, TCP/UDP/TLS/WebSocket/MQTT/WebRTC/IO/proxy
-//! handles, callbacks) travel as `int` wire values owned by the runtime scope
-//! state, not as catalog resources: `HostTypeSchema::Resource` would require
-//! the published ABI to declare matching resource keys, which it does not, and
-//! emulating them as a guest resource handle is forbidden by the migration
-//! policy. These boundaries are therefore documented and pinned by
-//! [`is_raw_handle_boundary`] plus [`RAW_HANDLE_BOUNDARY_FAMILY_COUNTS`] and
-//! the tests in this module, which fail whenever the boundary moves.
+//! Edge host handles travel as `int` wire values owned by runtime scope
+//! state. Guest resource effects cannot represent those tokens without
+//! changing the published ABI, so the enforceable metadata lives in
+//! [`super::raw_handles`].
 
 use std::collections::BTreeSet;
+use std::sync::{Arc, OnceLock};
 
-#[cfg(test)]
 use edge_abi::FUNCTIONS as EDGE_ABI_FUNCTIONS;
 use edge_abi::{AbiFunction, AbiParamType, AbiValueType};
 use vm::host_extension::guest_resource_effects;
 use vm::{
     HostAdapterDescriptor, HostApiCatalog, HostBindingDescriptor, HostBindingKind,
-    HostFunctionDescriptor, HostFunctionRegistry, HostFunctionSchema, HostParamSchema,
-    HostTypeSchema, VmError, VmResult,
+    HostFunctionDescriptor, HostFunctionRegistry, HostFunctionSchema, HostImportSchema,
+    HostParamSchema, HostStructField, HostTypeSchema, VmError, VmResult, catalog_import_schemas,
+    catalog_named_struct_schemas,
 };
+
+use super::raw_handles;
 
 /// Maps an ABI parameter wire type onto the descriptor schema language.
 ///
 /// The mapping is a projection of the published contract, never a
 /// strengthening of it: `Any` stays [`HostTypeSchema::Unknown`] and open
-/// collections stay `Map(Unknown)`/`Array(Unknown)`.
+/// collections stay `Map(Unknown)`/`Array(Unknown)`. Closed records are
+/// overlayed afterwards by [`overlay_named_return`].
 pub(crate) fn edge_param_type_schema(param: AbiParamType) -> HostTypeSchema {
     match param {
         AbiParamType::Any => HostTypeSchema::Unknown,
@@ -98,13 +98,83 @@ pub(crate) fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
     }
 }
 
+/// Closed MQTT connection event: `publish` | `closed` | `failed`.
+///
+/// Runtime values remain maps; the compiler catalog types the shape as a
+/// named struct so field access and `.has` stay exact.
+pub(crate) fn mqtt_event_schema() -> HostTypeSchema {
+    HostTypeSchema::named_struct(
+        "MqttEvent",
+        vec![
+            HostStructField::new("kind", HostTypeSchema::String),
+            HostStructField::new(
+                "topic",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+            ),
+            HostStructField::new(
+                "payload_text",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+            ),
+            HostStructField::new(
+                "payload_base64",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+            ),
+            HostStructField::new(
+                "qos",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::Int)),
+            ),
+            HostStructField::new(
+                "retain",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+            ),
+            HostStructField::new(
+                "dup",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+            ),
+            HostStructField::new(
+                "reason",
+                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+            ),
+        ],
+    )
+}
+
+/// Overlay closed records as named schemas without changing the coarse ABI
+/// wire type. Runtime values remain maps.
+fn overlay_named_return(name: &str, fallback: HostTypeSchema) -> HostTypeSchema {
+    match name {
+        "mqtt::connection::read_event" => mqtt_event_schema(),
+        _ => fallback,
+    }
+}
+
+/// Open header/query/trailer maps that remain `Map(Unknown)` on purpose.
+#[cfg(test)]
+pub(crate) const DYNAMIC_MAP_RETURNS: &[&str] = &[
+    "http::request::get_headers",
+    "http::request::get_query_args",
+    "http::response::get_trailers",
+    "http::response::get_headers",
+    "http::exchange::get_headers",
+    "http::exchange::get_trailers",
+];
+
+/// Polymorphic header-batch `any` parameters that remain Unknown.
+#[cfg(test)]
+pub(crate) const DYNAMIC_ANY_PARAMS: &[(&str, usize)] = &[
+    ("http::response::set_headers", 0),
+    ("http::response::apply_exchange_with_headers", 1),
+    ("http::exchange::prepare_default_upstream", 3),
+];
+
 /// The declared ABI entry for `name`, or `None` when the name is not part of
 /// the published edge ABI.
 pub(crate) fn edge_abi_function(name: &str) -> Option<&'static AbiFunction> {
     edge_abi::function_by_name(name)
 }
 
-/// Guest schema of one edge host function, derived from its ABI declaration.
+/// Guest schema of one edge host function, derived from its ABI declaration
+/// plus the named-struct overlay for closed records.
 ///
 /// A name that is not declared in the ABI spec is a hard error: an edge host
 /// function may not invent a guest contract the VM compiler cannot see.
@@ -129,9 +199,27 @@ pub(crate) fn edge_function_schema(name: &str) -> Result<HostFunctionSchema, Str
                 HostParamSchema::value(*param_name, edge_param_type_schema(*param_type))
             })
             .collect(),
-        return_type: edge_return_type_schema(function.return_type),
+        return_type: overlay_named_return(
+            function.name,
+            edge_return_type_schema(function.return_type),
+        ),
         description: function.docs.to_string(),
     })
+}
+
+/// Unbound placeholder for an ABI function this build does not implement.
+pub(crate) fn unbound_edge_descriptor(name: &str) -> HostFunctionDescriptor {
+    let schema = edge_function_schema(name)
+        .unwrap_or_else(|error| panic!("invalid unbound edge descriptor: {error}"));
+    HostFunctionDescriptor {
+        effects: guest_resource_effects(&schema),
+        schema,
+        binding: HostBindingDescriptor {
+            kind: HostBindingKind::Static,
+        },
+        adapter: HostAdapterDescriptor::Static(crate::abi_impl::unbound_edge_abi_function),
+        resource_types: Vec::new(),
+    }
 }
 
 /// The guest value type an edge host function parameter carries on the wire.
@@ -288,49 +376,44 @@ pub(crate) fn adapter_binding_kind(adapter: &HostAdapterDescriptor) -> HostBindi
 ///
 /// Every declared ABI function has exactly one descriptor; functions without a
 /// bound implementation in this build carry the *unbound* adapter, which is
-/// exactly what the runtime binds for them. The catalog is therefore a pure
-/// derivation of the ABI declaration set, and it is the snapshot the installed
-/// implementation descriptors are validated against.
-#[cfg(test)]
-pub(crate) fn edge_abi_catalog() -> HostApiCatalog {
-    let descriptors = EDGE_ABI_FUNCTIONS
-        .iter()
-        .map(|function| {
-            // The published declaration is authoritative for the whole ABI
-            // surface; the observed list only pins the arity.
-            let observed = function
-                .param_names
+/// exactly what the runtime binds for them. Named closed records are part of
+/// this catalog, so a second generation is fingerprint-identical.
+pub(crate) fn edge_abi_catalog_arc() -> Arc<HostApiCatalog> {
+    static CATALOG: OnceLock<Arc<HostApiCatalog>> = OnceLock::new();
+    CATALOG
+        .get_or_init(|| {
+            let descriptors = EDGE_ABI_FUNCTIONS
                 .iter()
-                .map(|name| (*name, EdgeGuestValueType::Unknown))
+                .map(|function| unbound_edge_descriptor(function.name))
                 .collect::<Vec<_>>();
-            edge_function_descriptor(
-                function.name,
-                &observed,
-                HostBindingKind::Static,
-                HostAdapterDescriptor::Static(crate::abi_impl::unbound_edge_abi_function),
+            Arc::new(
+                HostFunctionDescriptor::collect_catalog(&descriptors).unwrap_or_else(|error| {
+                    panic!("the published edge ABI must produce a valid catalog: {error}")
+                }),
             )
         })
-        .collect::<Vec<_>>();
-    HostFunctionDescriptor::collect_catalog(&descriptors).unwrap_or_else(|error| {
-        panic!("the published edge ABI must produce a valid catalog: {error}")
-    })
+        .clone()
+}
+
+/// The descriptor-derived guest catalog of the complete published edge ABI.
+#[cfg(test)]
+pub(crate) fn edge_abi_catalog() -> HostApiCatalog {
+    edge_abi_catalog_arc().as_ref().clone()
 }
 
 /// Installs one descriptor-driven set of edge adapters into `registry`.
 ///
-/// The complete set is validated first (schemas, guest resource effects,
-/// duplicates) and installed second, in one transaction: a rejected descriptor
-/// leaves the registry untouched. Adapters keep the edge dispatch identity the
-/// published ABI uses — the guest calls an edge import by name and arity —
-/// while every schema, binding, and adapter value comes from the descriptor,
-/// which is itself derived from the ABI declaration.
+/// Validation (ABI contract, uniqueness, raw-handle metadata) runs first.
+/// Published ABI names are installed through the frozen core catalog exact-
+/// adapter path, using the same catalog snapshot the compiler sees
+/// ([`edge_abi_catalog_arc`]). Reviewed extensions stay name-only so the
+/// guest compiler's dynamic arity/`Unknown` imports still bind. Both halves
+/// share one outer transaction: a rejected set leaves no registry entries,
+/// capabilities, or generation bump.
 pub(crate) fn install_edge_descriptors(
     registry: &mut HostFunctionRegistry,
     descriptors: &[HostFunctionDescriptor],
 ) -> VmResult<HostApiCatalog> {
-    let catalog = HostFunctionDescriptor::collect_catalog(descriptors).map_err(|error| {
-        VmError::HostError(format!("edge host descriptors are invalid: {error}"))
-    })?;
     let mut ordered = descriptors.iter().collect::<Vec<_>>();
     ordered.sort_by(|left, right| left.schema.name.cmp(&right.schema.name));
     let mut seen = BTreeSet::new();
@@ -343,13 +426,143 @@ pub(crate) fn install_edge_descriptors(
         }
         assert_declared_abi_contract(descriptor)?;
     }
+    raw_handles::validate_raw_handle_metadata(descriptors).map_err(VmError::HostError)?;
+    let catalog = edge_abi_catalog_arc();
     registry.transactionally(|registry| {
-        for descriptor in &ordered {
-            install_edge_descriptor(registry, descriptor)?;
+        registry.install_named_struct_schemas(catalog_named_struct_schemas(catalog.as_ref()))?;
+        for descriptor in descriptors {
+            install_one_edge_descriptor(registry, catalog.as_ref(), descriptor)?;
+            registry.authorize_registered_builtin_import(&descriptor.schema.name);
         }
-        Ok(())
+        Ok(catalog.as_ref().clone())
+    })
+}
+
+fn install_one_edge_descriptor(
+    registry: &mut HostFunctionRegistry,
+    catalog: &HostApiCatalog,
+    descriptor: &HostFunctionDescriptor,
+) -> VmResult<()> {
+    if edge_abi_function(&descriptor.schema.name).is_some() {
+        install_abi_descriptor_from_catalog(registry, catalog, descriptor)
+    } else {
+        install_extension_name_only(registry, descriptor)
+    }
+}
+
+fn install_abi_descriptor_from_catalog(
+    registry: &mut HostFunctionRegistry,
+    catalog: &HostApiCatalog,
+    descriptor: &HostFunctionDescriptor,
+) -> VmResult<()> {
+    let matched: Vec<HostImportSchema> = catalog_import_schemas(catalog, &descriptor.schema.name);
+    let schema = match matched.as_slice() {
+        [schema] => schema.clone(),
+        [] => {
+            return Err(VmError::HostError(format!(
+                "host function '{}' is missing from the edge ABI catalog",
+                descriptor.schema.name
+            )));
+        }
+        _ => {
+            return Err(VmError::HostError(format!(
+                "host function '{}' is ambiguous in the edge ABI catalog",
+                descriptor.schema.name
+            )));
+        }
+    };
+    install_catalog_adapter(registry, descriptor, schema)
+}
+
+fn install_catalog_adapter(
+    registry: &mut HostFunctionRegistry,
+    descriptor: &HostFunctionDescriptor,
+    schema: HostImportSchema,
+) -> VmResult<()> {
+    let mut runtime_owned_pending: Option<String> = None;
+    let result = match (&descriptor.binding.kind, &descriptor.adapter) {
+        (HostBindingKind::Static, HostAdapterDescriptor::Static(function)) => {
+            registry.register_catalog_static(schema, *function)
+        }
+        (HostBindingKind::StaticStack, HostAdapterDescriptor::StaticStack(function)) => {
+            registry.register_catalog_static_stack(schema, *function)
+        }
+        (
+            HostBindingKind::StaticStackRuntimeOwned,
+            HostAdapterDescriptor::StaticStackRuntimeOwned(function),
+        ) => {
+            runtime_owned_pending = Some(schema.name.clone());
+            registry.register_catalog_static_stack(schema, *function)
+        }
+        (HostBindingKind::StaticArgs, HostAdapterDescriptor::StaticArgs(function)) => {
+            registry.register_catalog_static_args(schema, *function)
+        }
+        (
+            HostBindingKind::StaticNonYieldingArgs,
+            HostAdapterDescriptor::StaticNonYieldingArgs(function),
+        ) => registry.register_catalog_static_non_yielding_args(schema, *function),
+        (HostBindingKind::Owned, HostAdapterDescriptor::Owned(factory)) => {
+            registry.register_catalog_owned(schema, *factory)
+        }
+        _ => {
+            return Err(VmError::HostError(format!(
+                "host function '{}' has a binding/adapter mismatch",
+                descriptor.schema.name
+            )));
+        }
+    };
+    result.map_err(|error| {
+        VmError::HostError(format!(
+            "failed to install host function '{}': {error}",
+            descriptor.schema.name
+        ))
     })?;
-    Ok(catalog)
+    if let Some(name) = runtime_owned_pending {
+        registry.mark_exact_runtime_owned_pending(&name)?;
+    }
+    Ok(())
+}
+
+fn install_extension_name_only(
+    registry: &mut HostFunctionRegistry,
+    descriptor: &HostFunctionDescriptor,
+) -> VmResult<()> {
+    let name = descriptor.schema.name.as_str();
+    let arity = u8::try_from(descriptor.schema.params.len()).map_err(|_| {
+        VmError::HostError(format!(
+            "edge extension '{name}' has more than 255 parameters"
+        ))
+    })?;
+    match (&descriptor.binding.kind, &descriptor.adapter) {
+        (HostBindingKind::Static, HostAdapterDescriptor::Static(function)) => {
+            registry.register_static(name, arity, *function);
+        }
+        (HostBindingKind::StaticStack, HostAdapterDescriptor::StaticStack(function)) => {
+            registry.register_static_stack(name, arity, *function);
+        }
+        (
+            HostBindingKind::StaticStackRuntimeOwned,
+            HostAdapterDescriptor::StaticStackRuntimeOwned(function),
+        ) => {
+            registry.register_static_stack(name, arity, *function);
+            registry.mark_exact_runtime_owned_pending(name)?;
+        }
+        (HostBindingKind::StaticArgs, HostAdapterDescriptor::StaticArgs(function)) => {
+            registry.register_static_args(name, arity, *function);
+        }
+        (
+            HostBindingKind::StaticNonYieldingArgs,
+            HostAdapterDescriptor::StaticNonYieldingArgs(function),
+        ) => {
+            registry.register_static_non_yielding_args(name, arity, *function);
+        }
+        _ => {
+            return Err(VmError::HostError(format!(
+                "edge extension '{name}' has a binding/adapter mismatch"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Rejects a descriptor whose guest contract disagrees with the published ABI
@@ -382,101 +595,19 @@ fn assert_declared_abi_contract(descriptor: &HostFunctionDescriptor) -> VmResult
     Ok(())
 }
 
-/// Registers one validated descriptor under the edge dispatch identity.
-fn install_edge_descriptor(
-    registry: &mut HostFunctionRegistry,
-    descriptor: &HostFunctionDescriptor,
-) -> VmResult<()> {
-    let name = descriptor.schema.name.clone();
-    let arity = u8::try_from(descriptor.schema.params.len()).map_err(|_| {
-        VmError::HostError(format!(
-            "edge host function '{name}' declares more than 255 parameters"
-        ))
-    })?;
-    match (&descriptor.binding.kind, &descriptor.adapter) {
-        (HostBindingKind::StaticStack, HostAdapterDescriptor::StaticStack(function)) => {
-            registry.register_static_stack(name, arity, *function);
-        }
-        (HostBindingKind::StaticArgs, HostAdapterDescriptor::StaticArgs(function)) => {
-            registry.register_static_args(name, arity, *function);
-        }
-        (binding, adapter) => {
-            return Err(VmError::HostError(format!(
-                "edge host function '{name}' cannot be installed: binding {binding:?} carries a {:?} adapter",
-                adapter_binding_kind(adapter)
-            )));
-        }
-    }
-    Ok(())
-}
-
-/// Namespace families whose ABI functions exchange raw runtime-owned handle
-/// tokens (created by the runtime, resolved by the runtime scope state, never
-/// by a guest resource handle).
-#[cfg(test)]
-pub(crate) const RAW_HANDLE_NAMESPACES: &[&str] = &[
-    "tcp::",
-    "udp::",
-    "tls::",
-    "websocket::",
-    "mqtt::",
-    "webrtc::",
-    "proxy::",
-    "http::exchange::",
-];
-
 /// Whether an ABI function sits on a raw runtime-owned handle boundary.
-///
-/// The rule is intentionally structural: the function belongs to a
-/// handle-owning namespace family *and* its contract carries an `int` in its
-/// parameters or return, i.e. a token the runtime must resolve. Counter-style
-/// `int` returns outside those families (`console::stdout::write`,
-/// `http::response::platform_status`) are not part of the boundary.
 #[cfg(test)]
 pub(crate) fn is_raw_handle_boundary(function: &AbiFunction) -> bool {
-    let in_handle_family = RAW_HANDLE_NAMESPACES
-        .iter()
-        .any(|prefix| function.name.starts_with(prefix));
-    in_handle_family
-        && (function.return_type == AbiValueType::Int
-            || function.param_types.contains(&AbiParamType::Int))
+    raw_handles::is_raw_handle_boundary(function)
 }
-
-/// Every ABI function on a raw handle boundary.
-#[cfg(test)]
-pub(crate) fn raw_handle_boundary_functions() -> Vec<&'static AbiFunction> {
-    EDGE_ABI_FUNCTIONS
-        .iter()
-        .filter(|function| is_raw_handle_boundary(function))
-        .collect()
-}
-
-/// The pinned size of every raw handle-token family (see
-/// [`is_raw_handle_boundary`]).
-///
-/// Each handle family is the reviewed record of how many ABI functions within
-/// it exchange a runtime-owned handle token. A count that changes means the
-/// boundary moved: a function was added, removed, or started/stopped carrying
-/// an `int` handle, and the change must be reviewed and recorded here.
-///
-/// Families that are empty in the current feature set (for example `mqtt::`
-/// without the `mqtt` feature) are skipped, so one build checks only the
-/// families it compiles.
-#[cfg(test)]
-pub(crate) const RAW_HANDLE_BOUNDARY_FAMILY_COUNTS: &[(&str, usize)] = &[
-    ("tcp::", 19),
-    ("udp::", 17),
-    ("tls::", 21),
-    ("websocket::", 21),
-    ("mqtt::", 19),
-    ("webrtc::", 19),
-    ("proxy::", 8),
-    ("http::exchange::", 27),
-];
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::abi_impl::raw_handles::{
+        RAW_HANDLE_EFFECTS, RAW_HANDLE_FAMILIES, RawHandleEffect, RawHandleMode, RawHandleSlot,
+        raw_handle_effects_for, raw_handle_effects_for_family, raw_handle_metadata_mismatches,
+    };
 
     #[test]
     fn every_declared_abi_function_produces_its_declared_schema() {
@@ -497,56 +628,130 @@ mod tests {
             }
             assert_eq!(
                 schema.return_type,
-                edge_return_type_schema(function.return_type)
+                overlay_named_return(function.name, edge_return_type_schema(function.return_type))
             );
         }
     }
 
     #[test]
-    fn dynamic_abi_types_stay_dynamic() {
-        let mut checked = 0usize;
+    fn remaining_dynamic_abi_types_match_the_allowlist() {
+        let mut map_returns = Vec::new();
+        let mut any_params = Vec::new();
         for function in EDGE_ABI_FUNCTIONS {
-            let schema = edge_function_schema(function.name).expect("declared schema");
-            for (index, param) in schema.params.iter().enumerate() {
-                match function.param_types[index] {
-                    AbiParamType::Any => {
-                        assert_eq!(
-                            param.ty,
-                            HostTypeSchema::Unknown,
-                            "'{}' must keep its `any` parameter dynamic",
-                            function.name
-                        );
-                        checked += 1;
-                    }
-                    AbiParamType::Map => {
-                        assert_eq!(
-                            param.ty,
-                            HostTypeSchema::Map(Box::new(HostTypeSchema::Unknown)),
-                            "'{}' must keep its open map parameter dynamic",
-                            function.name
-                        );
-                        checked += 1;
-                    }
-                    _ => {}
+            if function.return_type == AbiValueType::Map {
+                map_returns.push(function.name);
+            }
+            for (index, param) in function.param_types.iter().enumerate() {
+                if *param == AbiParamType::Any {
+                    any_params.push((function.name, index));
                 }
+                assert_ne!(
+                    *param,
+                    AbiParamType::Map,
+                    "'{}' has an unexpected map parameter; add it to the allowlist or type it",
+                    function.name
+                );
+            }
+        }
+        let remaining_maps: Vec<_> = map_returns
+            .iter()
+            .copied()
+            .filter(|name| *name != "mqtt::connection::read_event")
+            .collect();
+        assert_eq!(
+            remaining_maps, DYNAMIC_MAP_RETURNS,
+            "open map returns must stay an explicit allowlist"
+        );
+        assert_eq!(
+            any_params, DYNAMIC_ANY_PARAMS,
+            "open any parameters must stay an explicit allowlist"
+        );
+        for name in DYNAMIC_MAP_RETURNS {
+            if let Some(function) = edge_abi_function(name) {
+                let schema = edge_function_schema(name).expect("declared schema");
+                assert_eq!(
+                    schema.return_type,
+                    HostTypeSchema::Map(Box::new(HostTypeSchema::Unknown)),
+                    "'{name}' is an open map and must stay Map(Unknown)"
+                );
+                assert_eq!(function.return_type, AbiValueType::Map);
+            }
+        }
+        for (name, index) in DYNAMIC_ANY_PARAMS {
+            if let Some(function) = edge_abi_function(name) {
+                assert_eq!(function.param_types[*index], AbiParamType::Any);
+                let schema = edge_function_schema(name).expect("declared schema");
+                assert_eq!(schema.params[*index].ty, HostTypeSchema::Unknown);
+            }
+        }
+    }
+
+    #[test]
+    fn webrtc_has_no_map_or_any_wire_types() {
+        let mut hits = Vec::new();
+        for function in EDGE_ABI_FUNCTIONS {
+            if !function.name.starts_with("webrtc::") {
+                continue;
+            }
+            if function.return_type == AbiValueType::Map
+                || function.param_types.contains(&AbiParamType::Map)
+                || function.param_types.contains(&AbiParamType::Any)
+            {
+                hits.push(function.name);
             }
         }
         assert!(
-            checked > 0,
-            "the ABI surface must contain at least one intentionally dynamic parameter"
+            hits.is_empty(),
+            "WebRTC has no map/any wire types; observed {hits:?}"
+        );
+    }
+
+    #[cfg(feature = "mqtt")]
+    #[test]
+    fn mqtt_read_event_returns_named_mqtt_event() {
+        let function = edge_abi_function("mqtt::connection::read_event")
+            .expect("mqtt read_event is published");
+        assert_eq!(function.return_type, AbiValueType::Map);
+        let schema = edge_function_schema("mqtt::connection::read_event").expect("declared schema");
+        match schema.return_type {
+            HostTypeSchema::Named { name, fields } => {
+                assert_eq!(name, "MqttEvent");
+                assert_eq!(fields.len(), 8);
+                assert_eq!(fields[0].name, "kind");
+                assert_eq!(fields[0].ty, HostTypeSchema::String);
+            }
+            other => panic!("expected Named MqttEvent, got {other:?}"),
+        }
+        let catalog = edge_abi_catalog();
+        assert!(
+            catalog
+                .structs()
+                .iter()
+                .any(|record| record.name == "MqttEvent"),
+            "the ABI catalog must install the MqttEvent named struct"
         );
     }
 
     #[test]
     fn edge_abi_catalog_is_deterministic_and_complete() {
-        let first = edge_abi_catalog();
-        let second = edge_abi_catalog();
+        fn derive() -> HostApiCatalog {
+            let descriptors = EDGE_ABI_FUNCTIONS
+                .iter()
+                .map(|function| unbound_edge_descriptor(function.name))
+                .collect::<Vec<_>>();
+            HostFunctionDescriptor::collect_catalog(&descriptors).unwrap_or_else(|error| {
+                panic!("the published edge ABI must produce a valid catalog: {error}")
+            })
+        }
+        let first = derive();
+        let second = derive();
         assert_eq!(first.functions().len(), EDGE_ABI_FUNCTIONS.len());
         assert_eq!(
             first.fingerprint(),
             second.fingerprint(),
             "deriving the edge ABI catalog twice must produce one fingerprint"
         );
+        assert_eq!(first.fingerprint(), edge_abi_catalog().fingerprint());
     }
 
     #[test]
@@ -557,32 +762,96 @@ mod tests {
     }
 
     #[test]
-    fn raw_handle_boundary_families_match_the_documented_counts() {
-        let mut observed = Vec::new();
-        for family in RAW_HANDLE_NAMESPACES {
-            let count = raw_handle_boundary_functions()
-                .iter()
-                .filter(|function| function.name.starts_with(family))
-                .count();
-            observed.push((*family, count));
-        }
-        let mismatch = observed
-            .iter()
-            .filter(|(family, count)| {
-                let expected = RAW_HANDLE_BOUNDARY_FAMILY_COUNTS
-                    .iter()
-                    .find(|(name, _)| name == family)
-                    .map(|(_, expected)| *expected)
-                    .unwrap_or(0);
-                *count != 0 && *count != expected
-            })
-            .copied()
-            .collect::<Vec<_>>();
+    fn raw_handle_metadata_is_complete_and_coherent() {
+        let mismatches = raw_handle_metadata_mismatches(&EDGE_ABI_FUNCTIONS);
         assert!(
-            mismatch.is_empty(),
-            "the raw handle boundary moved; update RAW_HANDLE_BOUNDARY_FAMILY_COUNTS.\
-             \nobserved={observed:?}\ndocumented={RAW_HANDLE_BOUNDARY_FAMILY_COUNTS:?}"
+            mismatches.is_empty(),
+            "raw-handle metadata drifted: {mismatches:?}"
         );
+        for family in RAW_HANDLE_FAMILIES {
+            assert!(
+                raw_handle_effects_for_family(family).next().is_some(),
+                "raw-handle family '{family}' must have a non-vacuous static declaration"
+            );
+        }
+        assert!(
+            raw_handle_effects_for("http::response::apply_exchange")
+                .next()
+                .is_some(),
+            "http::response::apply_exchange must declare raw-handle metadata"
+        );
+        assert!(
+            raw_handle_effects_for("http::response::apply_exchange_with_headers")
+                .next()
+                .is_some(),
+            "http::response::apply_exchange_with_headers must declare raw-handle metadata"
+        );
+    }
+
+    #[test]
+    fn raw_handle_take_is_never_labelled_borrow() {
+        for effect in RAW_HANDLE_EFFECTS {
+            if effect.function.ends_with("::close")
+                || effect.function == "mqtt::connection::disconnect"
+            {
+                assert_eq!(
+                    effect.mode,
+                    RawHandleMode::Take,
+                    "{} close/disconnect must be take, not {:?}",
+                    effect.function,
+                    effect.mode
+                );
+                assert!(
+                    matches!(effect.slot, RawHandleSlot::Arg(_)),
+                    "take/close must name an argument on {}",
+                    effect.function
+                );
+            }
+            if effect.mode == RawHandleMode::Create {
+                assert_eq!(
+                    effect.slot,
+                    RawHandleSlot::Return,
+                    "create must name the return on {}",
+                    effect.function
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn raw_handle_metadata_rejects_unknown_family_and_pending_capture() {
+        let unknown = RawHandleEffect {
+            function: "tcp::stream::close",
+            slot: RawHandleSlot::Arg(0),
+            family: "not-a-family::",
+            mode: RawHandleMode::Take,
+        };
+        assert!(
+            !RAW_HANDLE_FAMILIES.contains(&unknown.family),
+            "the unknown-family probe must stay outside the allowlist"
+        );
+        let mut registry = HostFunctionRegistry::empty();
+        let mut descriptor = edge_function_descriptor(
+            "runtime::exit",
+            &[],
+            HostBindingKind::StaticStack,
+            HostAdapterDescriptor::StaticStack(|_vm, _args| {
+                Err(VmError::HostError("unused".to_string()))
+            }),
+        );
+        descriptor.binding = HostBindingDescriptor {
+            kind: HostBindingKind::StaticStackRuntimeOwned,
+        };
+        descriptor.adapter = HostAdapterDescriptor::StaticStackRuntimeOwned(|_vm, _args| {
+            Err(VmError::HostError("unused".to_string()))
+        });
+        let error = install_edge_descriptors(&mut registry, &[descriptor])
+            .expect_err("runtime-owned pending without metadata must fail");
+        assert!(
+            error.to_string().contains("runtime-owned pending"),
+            "{error}"
+        );
+        assert!(!registry.contains_name("runtime::exit"));
     }
 
     #[test]

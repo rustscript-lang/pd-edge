@@ -19,6 +19,8 @@ use crate::lock_metrics::{self, LockMetricKey, ProfiledMutexGuard};
 #[cfg(feature = "console")]
 mod console;
 mod descriptor;
+mod raw_handles;
+pub(crate) use descriptor::edge_abi_catalog_arc;
 pub(crate) mod http;
 mod http2;
 mod http3;
@@ -862,7 +864,9 @@ mod tests {
     use pd_edge_host_function::pd_edge_host_function;
     #[cfg(feature = "http")]
     use vm::{BytecodeBuilder, CallOutcome, VmError, VmStatus};
-    use vm::{HostImport, OpCode, Program, ValueType, Vm};
+    use vm::{
+        HostImport, HostImportSchema, OpCode, Program, ValueType, Vm, catalog_import_schemas,
+    };
 
     use super::registry::{EdgeHostScope, PD_EDGE_HOST_FUNCTIONS};
     use super::{
@@ -915,6 +919,29 @@ mod tests {
         ))
     }
 
+    fn catalog_schema_for_import(import: &HostImport) -> HostImportSchema {
+        catalog_import_schemas(&super::descriptor::edge_abi_catalog(), &import.name)
+            .into_iter()
+            .find(|schema| schema.arity() == usize::from(import.arity))
+            .unwrap_or_else(|| {
+                panic!(
+                    "edge ABI catalog is missing {}:{}",
+                    import.name, import.arity
+                )
+            })
+    }
+
+    fn program_with_edge_imports(
+        constants: Vec<vm::Value>,
+        code: Vec<u8>,
+        imports: Vec<HostImport>,
+    ) -> Program {
+        let schemas = imports.iter().map(catalog_schema_for_import).collect();
+        Program::with_imports_and_debug(constants, code, imports, None)
+            .with_host_import_schemas(schemas)
+            .expect("edge ABI import schemas should attach")
+    }
+
     #[test]
     fn register_host_module_binds_cached_runtime_scope_plan() {
         let imports = vec![HostImport {
@@ -922,8 +949,7 @@ mod tests {
             arity: 1,
             return_type: ValueType::Unknown,
         }];
-        let program =
-            Program::with_imports_and_debug(vec![], vec![OpCode::Ret as u8], imports, None);
+        let program = program_with_edge_imports(vec![], vec![OpCode::Ret as u8], imports);
 
         let mut first = Vm::new(program.clone());
         register_host_module(&mut first, test_context(), new_shared_vm_async_ops())
@@ -961,31 +987,22 @@ mod tests {
     #[cfg(feature = "http")]
     #[test]
     fn register_http_plane_host_module_binds_cached_multi_scope_plan() {
-        let imports = vec![
-            HostImport {
-                name: http_request::GET_METHOD.name.to_string(),
-                arity: 0,
-                return_type: ValueType::Unknown,
-            },
-            HostImport {
-                name: "http::request::body::next_chunk".to_string(),
-                arity: 1,
-                return_type: ValueType::Unknown,
-            },
-            HostImport {
-                name: "io::exists".to_string(),
-                arity: 1,
-                return_type: ValueType::Unknown,
-            },
-            HostImport {
-                name: edge_runtime::SLEEP.name.to_string(),
-                arity: 1,
-                return_type: ValueType::Unknown,
-            },
-        ];
-        let import_count = imports.len();
-        let program =
-            Program::with_imports_and_debug(vec![], vec![OpCode::Ret as u8], imports, None);
+        let compiled = crate::compile_edge_source_with_flavor(
+            r#"
+                use http;
+                use io;
+                use runtime;
+
+                http::request::get_method();
+                http::request::body::next_chunk(0);
+                io::exists("");
+                runtime::sleep(0);
+            "#,
+            vm::SourceFlavor::RustScript,
+        )
+        .expect("multi-scope source should compile against the edge catalog");
+        let import_count = compiled.program.imports.len();
+        let program = compiled.program.with_local_count(compiled.locals);
         let mut vm = Vm::new(program);
         register_http_plane_host_module(&mut vm, test_context(), new_shared_vm_async_ops())
             .expect("http plane vm should bind all cached scopes");
@@ -1005,8 +1022,7 @@ mod tests {
             arity: 0,
             return_type: ValueType::Unknown,
         }];
-        let program =
-            Program::with_imports_and_debug(vec![], vec![OpCode::Ret as u8], imports, None);
+        let program = program_with_edge_imports(vec![], vec![OpCode::Ret as u8], imports);
         let mut vm = Vm::new(program);
         vm.bind_static_function("custom::noop", super::unbound_edge_abi_function);
 
@@ -1033,12 +1049,8 @@ mod tests {
         bc.ldc(0);
         bc.call(0, 1);
         bc.ret();
-        let program = Program::with_imports_and_debug(
-            vec![vm::Value::string("payload")],
-            bc.finish(),
-            imports,
-            None,
-        );
+        let program =
+            program_with_edge_imports(vec![vm::Value::string("payload")], bc.finish(), imports);
         let context = test_context();
         let async_ops = new_shared_vm_async_ops();
         let mut vm = Vm::new(program);

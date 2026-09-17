@@ -24,7 +24,7 @@ use edge_abi::FUNCTIONS as EDGE_ABI_FUNCTIONS;
 use vm::host_extension::{HostAdapterDescriptor, HostFunctionDescriptor};
 use vm::{HostFunctionRegistry, Vm, VmError};
 
-use super::descriptor::install_edge_descriptors;
+use super::descriptor::{install_edge_descriptors, unbound_edge_descriptor};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum EdgeHostScope {
@@ -112,16 +112,31 @@ fn scope_descriptors(scope_mask_bits: u16) -> Vec<HostFunctionDescriptor> {
     descriptors
 }
 
+/// Implemented descriptors for the mask plus unbound placeholders for every
+/// published ABI name the mask does not implement, plus reviewed extensions.
+fn complete_scope_descriptors(scope_mask_bits: u16) -> Vec<HostFunctionDescriptor> {
+    let implemented = scope_descriptors(scope_mask_bits);
+    let mut by_name = HashMap::new();
+    for descriptor in implemented {
+        by_name.insert(descriptor.schema.name.clone(), descriptor);
+    }
+    let mut descriptors = Vec::new();
+    for function in EDGE_ABI_FUNCTIONS {
+        if let Some(descriptor) = by_name.remove(function.name) {
+            descriptors.push(descriptor);
+        } else {
+            descriptors.push(unbound_edge_descriptor(function.name));
+        }
+    }
+    let mut extras = by_name.into_values().collect::<Vec<_>>();
+    extras.sort_by(|left, right| left.schema.name.cmp(&right.schema.name));
+    descriptors.extend(extras);
+    descriptors
+}
+
 fn registry_for_scope_mask(scope_mask_bits: u16) -> Result<HostFunctionRegistry, VmError> {
     let mut registry = HostFunctionRegistry::new();
-    for function in EDGE_ABI_FUNCTIONS {
-        registry.register_static(
-            function.name,
-            function.arity,
-            super::unbound_edge_abi_function,
-        );
-    }
-    install_edge_descriptors(&mut registry, &scope_descriptors(scope_mask_bits))?;
+    install_edge_descriptors(&mut registry, &complete_scope_descriptors(scope_mask_bits))?;
     Ok(registry)
 }
 
@@ -309,7 +324,11 @@ mod tests {
         );
         let error = install_edge_descriptors(&mut registry, &[rejected, accepted])
             .expect_err("the mismatched descriptor must fail the transaction");
-        assert!(error.to_string().contains("cannot be installed"), "{error}");
+        assert!(
+            error.to_string().contains("binding/adapter mismatch")
+                || error.to_string().contains("cannot be installed"),
+            "{error}"
+        );
         assert!(
             !registry.contains_name("runtime::exit"),
             "a failed installation must leave the registry untouched"
@@ -355,5 +374,87 @@ mod tests {
                 function.name
             );
         }
+    }
+
+    #[test]
+    fn every_reviewed_extension_is_implemented() {
+        use super::super::descriptor::EDGE_EXTENSION_FUNCTIONS;
+        assert_eq!(
+            EDGE_EXTENSION_FUNCTIONS.len(),
+            12,
+            "the reviewed extension surface is exactly 12 names"
+        );
+        let implemented = PD_EDGE_HOST_FUNCTIONS
+            .iter()
+            .map(|registration| (registration.descriptor)().schema.name)
+            .collect::<std::collections::BTreeSet<_>>();
+        for name in EDGE_EXTENSION_FUNCTIONS {
+            assert!(
+                implemented.contains(*name),
+                "reviewed extension '{name}' must be implemented in the discovery inventory"
+            );
+        }
+    }
+
+    #[test]
+    fn restricted_registry_denies_before_install_and_authorizes_exact_imports() {
+        let mut registry = HostFunctionRegistry::restricted();
+        assert!(
+            !registry.contains_name("tcp::stream::close"),
+            "restricted registry must deny tcp::stream::close before install"
+        );
+        assert!(
+            !registry.contains_name("udp::socket::close"),
+            "restricted registry must deny udp::socket::close before install"
+        );
+        let installed = edge_function_descriptor(
+            "tcp::stream::close",
+            &[("stream", EdgeGuestValueType::Int)],
+            HostBindingKind::StaticStack,
+            HostAdapterDescriptor::StaticStack(stack_adapter),
+        );
+        install_edge_descriptors(&mut registry, &[installed])
+            .expect("exact catalog install must succeed");
+        assert!(
+            registry.contains_name("tcp::stream::close"),
+            "installed import must be authorized and bound"
+        );
+        assert!(
+            !registry.contains_name("udp::socket::close"),
+            "unlisted imports must remain denied"
+        );
+    }
+
+    #[test]
+    fn restricted_registry_rollback_leaves_no_partial_entries() {
+        let mut registry = HostFunctionRegistry::restricted();
+        let mut rejected = edge_function_descriptor(
+            "tcp::stream::close",
+            &[("stream", EdgeGuestValueType::Int)],
+            HostBindingKind::StaticStack,
+            HostAdapterDescriptor::StaticStack(stack_adapter),
+        );
+        rejected.adapter = HostAdapterDescriptor::StaticArgs(args_adapter);
+        let accepted = edge_function_descriptor(
+            "udp::socket::close",
+            &[("socket", EdgeGuestValueType::Int)],
+            HostBindingKind::StaticStack,
+            HostAdapterDescriptor::StaticStack(stack_adapter),
+        );
+        let error = install_edge_descriptors(&mut registry, &[rejected, accepted])
+            .expect_err("mismatched adapter must fail the transaction");
+        assert!(
+            error.to_string().contains("binding/adapter mismatch")
+                || error.to_string().contains("cannot be installed"),
+            "{error}"
+        );
+        assert!(
+            !registry.contains_name("tcp::stream::close"),
+            "rollback must leave no partial registry entries"
+        );
+        assert!(
+            !registry.contains_name("udp::socket::close"),
+            "rollback must not authorize later descriptors"
+        );
     }
 }
