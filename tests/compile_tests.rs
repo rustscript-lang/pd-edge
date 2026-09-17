@@ -219,25 +219,25 @@ fn sample_anthropic_messages_to_openai_chat_completions_program_compiles_and_lin
 
 #[test]
 fn compile_edge_source_file_prefers_local_module_over_host_namespace_fallback() {
-    let root = unique_temp_root("runtime_local_module");
+    let root = unique_temp_root("helper_local_module");
 
-    let runtime_module = root.join("runtime.rss");
+    let helper_module = root.join("helper.rss");
     std::fs::write(
-        &runtime_module,
+        &helper_module,
         r#"
         pub fn sleep(ms) {
             ms + 1;
         }
     "#,
     )
-    .expect("runtime module should write");
+    .expect("helper module should write");
 
     let main_path = root.join("main.rss");
     std::fs::write(
         &main_path,
         r#"
-        use runtime;
-        runtime::sleep(41);
+        use helper;
+        helper::sleep(41);
     "#,
     )
     .expect("main source should write");
@@ -245,7 +245,7 @@ fn compile_edge_source_file_prefers_local_module_over_host_namespace_fallback() 
     let compiled = compile_edge_source_file(main_path.as_path()).expect("compile should succeed");
     assert!(
         compiled.program.imports.is_empty(),
-        "local runtime module should win over host namespace fallback"
+        "a local file module that is not an edge ABI host namespace must still compile as a guest module"
     );
 
     let mut vm = Vm::new(compiled.program);
@@ -254,15 +254,15 @@ fn compile_edge_source_file_prefers_local_module_over_host_namespace_fallback() 
     assert_eq!(vm.stack(), &[Value::Int(42)]);
 
     let _ = std::fs::remove_file(main_path);
-    let _ = std::fs::remove_file(runtime_module);
+    let _ = std::fs::remove_file(helper_module);
     let _ = std::fs::remove_dir(root);
 }
 
 #[test]
 fn compile_edge_source_file_with_options_can_override_runtime_module() {
-    let root = unique_temp_root("runtime_override");
+    let root = unique_temp_root("helper_override");
 
-    let override_module = root.join("custom_runtime.rss");
+    let override_module = root.join("custom_helper.rss");
     std::fs::write(
         &override_module,
         r#"
@@ -277,19 +277,19 @@ fn compile_edge_source_file_with_options_can_override_runtime_module() {
     std::fs::write(
         &main_path,
         r#"
-        use runtime;
-        runtime::sleep(40);
+        use helper;
+        helper::sleep(40);
     "#,
     )
     .expect("main source should write");
 
     let options =
-        CompileSourceFileOptions::new().with_module_override_path("runtime.rss", &override_module);
+        CompileSourceFileOptions::new().with_module_override_path("helper.rss", &override_module);
     let compiled =
         compile_edge_source_file_with_options(&main_path, options).expect("compile should succeed");
     assert!(
         compiled.program.imports.is_empty(),
-        "runtime module override should replace host import fallback"
+        "module override should replace a same-named guest file module"
     );
 
     let mut vm = Vm::new(compiled.program);

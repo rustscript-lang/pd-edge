@@ -11,7 +11,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use edge::HOST_FUNCTION_COUNT;
+use edge::{HOST_FUNCTION_COUNT, compile_edge_source_with_flavor};
 #[cfg(feature = "http3")]
 use futures_util::future::poll_fn;
 use http_body_util::{BodyExt, Full};
@@ -40,7 +40,7 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs
 #[cfg(all(feature = "http2", feature = "tls"))]
 use tokio_rustls::{TlsAcceptor, rustls::ServerConfig};
 use url::Url;
-use vm::{compile_source, encode_program, validate_program};
+use vm::{SourceFlavor, encode_program, validate_program};
 
 #[cfg(feature = "http3")]
 use rustls::{
@@ -2224,9 +2224,10 @@ fn kib_to_mib(value: u64) -> f64 {
 }
 
 fn compile_program_to_vmbc(source: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let compiled = compile_source(source).map_err(|err| {
-        io::Error::other(format!("failed to compile benchmark program source: {err}"))
-    })?;
+    let compiled =
+        compile_edge_source_with_flavor(source, SourceFlavor::RustScript).map_err(|err| {
+            io::Error::other(format!("failed to compile benchmark program source: {err}"))
+        })?;
     validate_program(&compiled.program, HOST_FUNCTION_COUNT)?;
     let bytes = encode_program(&compiled.program)?;
     Ok(bytes)
