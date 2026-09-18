@@ -1800,7 +1800,7 @@ dependencies = [
  "mimalloc",
  "owo-colors",
  "parking_lot",
- "pd-edge-abi 0.1.0",
+ "pd-edge-abi",
  "pd-edge-host-function",
  "pd-vm",
  "quinn",
@@ -1830,17 +1830,7 @@ dependencies = [
 name = "pd-edge-abi"
 version = "0.1.0"
 dependencies = [
- "pd-host-function 0.1.0",
- "syn",
-]
-
-[[package]]
-name = "pd-edge-abi"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9676d58588b220f7af69d7aa86108042d2acaf21dd24c641a6d9ef3c4e193ba"
-dependencies = [
- "pd-host-function 0.22.5",
+ "pd-host-function",
  "syn",
 ]
 
@@ -1859,17 +1849,6 @@ version = "0.1.0"
 source = "git+https://github.com/rustscript-lang/rustscript.git?rev=b1d6cffede77f49410bf63525f30b9a46b02dc01#b1d6cffede77f49410bf63525f30b9a46b02dc01"
 dependencies = [
  "pd-host-schema",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "pd-host-function"
-version = "0.22.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bfe63e312bbec4b39b6b0eb3681aef8b31cf31252bb39f9d7dbd2792b8f9869"
-dependencies = [
  "proc-macro2",
  "quote",
  "syn",
@@ -1898,8 +1877,7 @@ dependencies = [
  "futures-channel",
  "libc",
  "paste",
- "pd-edge-abi 0.1.1",
- "pd-host-function 0.1.0",
+ "pd-host-function",
  "pd-host-schema",
  "regex",
  "rt-format",
