@@ -38,7 +38,7 @@ pub use build_info::{
 };
 pub use compile::{
     compile_edge_source_file, compile_edge_source_file_with_options,
-    compile_edge_source_with_flavor,
+    compile_edge_source_with_flavor, edge_compile_options,
 };
 pub use control_plane_rpc::{
     CommandResultPayload, ControlPlaneCommand, DebugSessionMode, EdgeCommandResult,

@@ -4,9 +4,16 @@
 //! Every assertion here fails on a stale pin, an abbreviated revision, a
 //! sibling path pin, or a moving branch pin, so a dependency refresh cannot
 //! silently retarget the migration.
+//!
+//! Architecture guards also fail if pd-edge re-enables `vm/edge-abi` (the
+//! crates.io ABI24 universe) or if any registry `pd-edge*`, `pd-host-*`, or
+//! `pd-vm*` family crate appears in Cargo.lock or feature-matrix metadata.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use serde::Deserialize;
 
 /// The frozen core candidate this workspace migrates against.
 const FROZEN_CORE_REV: &str = "b1d6cffede77f49410bf63525f30b9a46b02dc01";
@@ -148,6 +155,233 @@ fn every_locked_core_revision_is_the_frozen_one() {
         assert!(
             source.contains(&format!("?rev={FROZEN_CORE_REV}#{FROZEN_CORE_REV}")),
             "a stale core revision is locked: {source}"
+        );
+    }
+}
+
+fn is_family_package(name: &str) -> bool {
+    name == "pd-vm"
+        || name.starts_with("pd-vm-")
+        || name.starts_with("pd-edge")
+        || name.starts_with("pd-host-")
+}
+
+fn parse_quoted_strings(value: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut rest = value;
+    while let Some(start) = rest.find('"') {
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('"') else {
+            break;
+        };
+        items.push(rest[..end].to_string());
+        rest = &rest[end + 1..];
+    }
+    items
+}
+
+fn pd_edge_feature_table(manifest: &str) -> BTreeMap<String, Vec<String>> {
+    let mut table = BTreeMap::new();
+    let mut in_features = false;
+    for line in manifest.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_features = trimmed == "[features]";
+            continue;
+        }
+        if !in_features || trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((name, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        table.insert(name.trim().to_string(), parse_quoted_strings(value));
+    }
+    table
+}
+
+fn enables_vm_edge_abi(item: &str) -> bool {
+    item == "vm/edge-abi" || item == "edge-abi" || item.starts_with("vm/edge-abi")
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoMetadata {
+    packages: Vec<MetadataPackage>,
+    resolve: MetadataResolve,
+}
+
+#[derive(Debug, Deserialize)]
+struct MetadataPackage {
+    name: String,
+    version: String,
+    id: String,
+    source: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MetadataResolve {
+    nodes: Vec<MetadataNode>,
+}
+
+#[derive(Debug, Deserialize)]
+struct MetadataNode {
+    id: String,
+    features: Vec<String>,
+}
+
+fn host_target_triple() -> String {
+    let output = Command::new("rustc")
+        .arg("-vV")
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run rustc -vV: {error}"));
+    assert!(
+        output.status.success(),
+        "rustc -vV failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("rustc -vV must be utf-8")
+        .lines()
+        .find_map(|line| line.strip_prefix("host: ").map(str::to_string))
+        .expect("rustc -vV must report the host triple")
+}
+
+fn cargo_metadata(extra: &[&str]) -> CargoMetadata {
+    let host = host_target_triple();
+    let output = Command::new(env!("CARGO"))
+        .arg("metadata")
+        .arg("--format-version")
+        .arg("1")
+        .arg("--offline")
+        .arg("--locked")
+        .arg("--filter-platform")
+        .arg(&host)
+        .arg("--manifest-path")
+        .arg(manifest_dir().join("Cargo.toml"))
+        .args(extra)
+        .current_dir(manifest_dir())
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run cargo metadata: {error}"));
+    assert!(
+        output.status.success(),
+        "cargo metadata {} failed:\n{}",
+        extra.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "cargo metadata {} produced invalid JSON: {error}",
+            extra.join(" ")
+        )
+    })
+}
+
+fn family_registry_offenders(metadata: &CargoMetadata) -> Vec<String> {
+    metadata
+        .packages
+        .iter()
+        .filter(|package| is_family_package(&package.name))
+        .filter_map(|package| {
+            let source = package.source.as_deref()?;
+            source
+                .starts_with("registry+")
+                .then(|| format!("{} {} source={source}", package.name, package.version))
+        })
+        .collect()
+}
+
+fn pd_vm_enabled_features(metadata: &CargoMetadata) -> BTreeSet<String> {
+    let package = metadata
+        .packages
+        .iter()
+        .find(|package| package.name == "pd-vm")
+        .unwrap_or_else(|| panic!("cargo metadata must include the pd-vm package"));
+    metadata
+        .resolve
+        .nodes
+        .iter()
+        .find(|node| node.id == package.id)
+        .unwrap_or_else(|| panic!("cargo metadata must resolve pd-vm in the feature graph"))
+        .features
+        .iter()
+        .cloned()
+        .collect()
+}
+
+fn in_tree_abi25_present(metadata: &CargoMetadata) -> bool {
+    metadata.packages.iter().any(|package| {
+        package.name == "pd-edge-abi"
+            && package.version == "0.1.0"
+            && package.source.is_none()
+            && !package.id.contains("registry+")
+    })
+}
+
+fn feature_matrices() -> &'static [(&'static str, &'static [&'static str])] {
+    &[
+        ("default", &[]),
+        ("no-default", &["--no-default-features"]),
+        ("http", &["--no-default-features", "--features", "http"]),
+        ("mqtt", &["--features", "mqtt"]),
+        ("all-features", &["--all-features"]),
+    ]
+}
+
+#[test]
+fn pd_edge_features_never_enable_vm_edge_abi() {
+    let manifest = read(&manifest_dir().join("Cargo.toml"));
+    let vm_line = dependency_line(&manifest, "vm");
+    assert!(
+        !vm_line.contains("edge-abi"),
+        "the pd-vm dependency must not enable edge-abi: {vm_line}"
+    );
+
+    let table = pd_edge_feature_table(&manifest);
+    assert!(
+        !table.contains_key("edge-abi"),
+        "pd-edge must not expose a legacy edge-abi feature: {table:?}"
+    );
+    for (name, enables) in &table {
+        assert!(
+            !enables.iter().any(|item| enables_vm_edge_abi(item)),
+            "feature `{name}` re-enables the legacy pd-vm ABI24 universe: {enables:?}"
+        );
+    }
+
+    let http = table
+        .get("http")
+        .expect("the http feature must remain declared");
+    assert!(
+        http.iter().any(|item| item == "edge_abi/http"),
+        "http must keep enabling the in-tree ABI25 http surface: {http:?}"
+    );
+    assert!(
+        !http.iter().any(|item| enables_vm_edge_abi(item)),
+        "http must not enable vm/edge-abi: {http:?}"
+    );
+}
+
+#[test]
+fn feature_matrix_metadata_keeps_git_abi25_and_drops_registry_family() {
+    for (label, extra) in feature_matrices() {
+        let metadata = cargo_metadata(extra);
+        let offenders = family_registry_offenders(&metadata);
+        assert!(
+            offenders.is_empty(),
+            "{label} cargo metadata pulled registry family crates: {offenders:?}"
+        );
+        let features = pd_vm_enabled_features(&metadata);
+        assert!(
+            features.contains("runtime"),
+            "{label} cargo metadata must keep pd-vm runtime: {features:?}"
+        );
+        assert!(
+            !features.contains("edge-abi"),
+            "{label} cargo metadata enabled pd-vm edge-abi: {features:?}"
+        );
+        assert!(
+            in_tree_abi25_present(&metadata),
+            "{label} cargo metadata must keep the in-tree ABI25 pd-edge-abi crate"
         );
     }
 }
