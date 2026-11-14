@@ -15,7 +15,7 @@ http::exchange::set_path(upstream, upstream_path);
 http::exchange::set_method(upstream, http::request::get_method());
 
 // `io::read_all(0)` consumes the downstream request body.
-let staged = io::read_all(downstream);
+let staged = io_read_all_text(downstream);
 
 // `io::write(1, ...)` stages bytes into the default upstream request body.
 io::write(upstream, staged + "|via-io-handle");
@@ -23,5 +23,30 @@ io::write(upstream, staged + "|via-io-handle");
 // Reading from the same upstream handle advances the outbound exchange and returns the response.
 http::response::set_status(http::exchange::get_status(upstream));
 http::response::set_header("x-io-upstream-handles", "true");
-http::response::set_header("x-first-line", io::read_line(upstream));
-http::response::set_body(io::read_all(upstream));
+http::response::set_header("x-first-line", io_line_text(upstream));
+http::response::set_body(io_read_all_text(upstream));
+
+// `io::read_all` reports a recoverable read failure as the guest error instead
+// of a bare string. This sample only needs the text, so a failure keeps the
+// previous empty-string default.
+fn io_read_all_text(handle: int) -> string {
+    let value: Result<string, string> = io::read_all(handle);
+    match value {
+        Result::Ok(text) => text,
+        Result::Err(error) => "",
+    }
+}
+
+// `io::read_line` reports end of stream as `Option::None` and a read failure as
+// the guest error instead of returning an empty string. This sample reads one
+// line for a header value, so both keep the previous empty-string default.
+fn io_line_text(handle: int) -> string {
+    let value: Result<Option<string>, string> = io::read_line(handle);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}

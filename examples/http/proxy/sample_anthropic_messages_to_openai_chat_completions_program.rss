@@ -62,14 +62,14 @@ struct OpenAiUsage {
 struct OpenAiAssistantMessage {
     role: string,
     content: string,
-    refusal: null,
-    annotations: [null],
+    refusal: (),
+    annotations: [()],
 }
 
 struct OpenAiChoice {
     index: int,
     message: OpenAiAssistantMessage,
-    logprobs: null,
+    logprobs: (),
     finish_reason: string,
 }
 
@@ -80,7 +80,7 @@ struct OpenAiCompletion {
     model: string,
     choices: [OpenAiChoice],
     usage: OpenAiUsage,
-    system_fingerprint: null,
+    system_fingerprint: (),
 }
 
 struct OpenAiRoleDelta {
@@ -97,7 +97,7 @@ struct OpenAiEmptyDelta {}
 struct OpenAiStreamChoice<TDelta, TFinish> {
     index: int,
     delta: TDelta,
-    logprobs: null,
+    logprobs: (),
     finish_reason: TFinish,
 }
 
@@ -155,7 +155,7 @@ fn openai_stream_chunk<TDelta, TFinish>(
     let choice = {
         index: 0,
         delta: delta,
-        logprobs: null,
+        logprobs: (),
         finish_reason: finish_reason,
     };
     let chunk: OpenAiStreamChunk<TDelta, TFinish> = {
@@ -191,11 +191,11 @@ fn process_stream_event(event_data: string, state: StreamState) -> StreamState {
             role: "assistant",
             content: "",
         };
-        let role_chunk = openai_stream_chunk::<OpenAiRoleDelta, null>(
+        let role_chunk = openai_stream_chunk::<OpenAiRoleDelta, ()>(
             stream_id.copy(),
             stream_model.copy(),
             role_delta,
-            null
+            ()
         );
         let role_chunk_json = json::encode(role_chunk);
         write_sse_data(role_chunk_json);
@@ -210,11 +210,11 @@ fn process_stream_event(event_data: string, state: StreamState) -> StreamState {
             let text = delta.text;
             if text != "" {
                 let text_delta = {content: text};
-                let text_chunk = openai_stream_chunk::<OpenAiContentDelta, null>(
+                let text_chunk = openai_stream_chunk::<OpenAiContentDelta, ()>(
                     next_stream_id.copy(),
                     next_stream_model.copy(),
                     text_delta,
-                    null
+                    ()
                 );
                 let text_chunk_json = json::encode(text_chunk);
                 write_sse_data(text_chunk_json);
@@ -375,7 +375,7 @@ if upstream_status != 200 {
     };
 
     while !http::exchange::body::eof(upstream) {
-        let line = io::read_line(upstream);
+        let line = io_line_text(upstream);
         if line == "" {
             if event_data != "" {
                 state = process_stream_event(event_data, state);
@@ -448,13 +448,13 @@ if upstream_status != 200 {
     let assistant_message: OpenAiAssistantMessage = {
         role: "assistant",
         content: text,
-        refusal: null,
+        refusal: (),
         annotations: [],
     };
     let choice: OpenAiChoice = {
         index: 0,
         message: assistant_message,
-        logprobs: null,
+        logprobs: (),
         finish_reason: finish_reason,
     };
     let openai_response: OpenAiCompletion = {
@@ -464,7 +464,7 @@ if upstream_status != 200 {
         model: model,
         choices: [choice],
         usage: response_usage,
-        system_fingerprint: null,
+        system_fingerprint: (),
     };
 
     http::response::set_header("content-type", "application/json");
@@ -490,6 +490,20 @@ fn request_header_text(name: string) -> string {
 // so absence and a malformed value keep the previous empty-string default.
 fn exchange_header_text(exchange: int, name: string) -> string {
     let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}
+
+// `io::read_line` reports end of stream as `Option::None` and a read failure as
+// the guest error instead of returning an empty string. The stream loop tests
+// `eof`, so an absent line keeps the previous empty-string boundary default.
+fn io_line_text(handle: int) -> string {
+    let value: Result<Option<string>, string> = io::read_line(handle);
     match value {
         Result::Ok(present) => match present {
             Option::Some(text) => text,

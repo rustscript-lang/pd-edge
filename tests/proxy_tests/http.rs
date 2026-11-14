@@ -2607,11 +2607,25 @@ async fn direct_vm_can_read_upstream_response_line_by_line_via_io_handle_api() {
         let downstream = tcp::stream::downstream();
 
         while !http::exchange::body::eof(upstream) {{
-            let line = io::read_line(upstream);
+            let line = io_line_text(upstream);
             if line == "" {{
                 tcp::stream::write(downstream, "\n");
             }} else {{
                 tcp::stream::write(downstream, line + "\n");
+            }}
+        }}
+
+        // `io::read_line` is the core fallible optional-text contract: EOF is
+        // `Option::None`, a blank line is `Some("")`, and a failure is the
+        // guest error. The loop tests `eof`, so both keep "" here.
+        fn io_line_text(handle: int) -> string {{
+            let value: Result<Option<string>, string> = io::read_line(handle);
+            match value {{
+                Result::Ok(present) => match present {{
+                    Option::Some(text) => text,
+                    Option::None => "",
+                }},
+                Result::Err(error) => "",
             }}
         }}
     "#,
@@ -4606,5 +4620,228 @@ async fn http_proxy_https_listener_explicit_handoff_exposes_downstream_mtls_and_
 
     http_handle.abort();
     https_handle.abort();
+    admin_handle.abort();
+}
+
+/// End-to-end coverage for `http::exchange::get_header` as the published
+/// `Result<Option<string>, string>` contract: a header the upstream response
+/// carries is `Ok(Some(text))` and a header it does not carry is `Ok(None)`.
+#[tokio::test]
+async fn exchange_get_header_reports_present_and_absent_members() {
+    let upstream_app = Router::new().fallback(any(|request: Request<Body>| async move {
+        let mut response = Response::new(Body::from("exchange-header-body"));
+        if request.uri().path() == "/present" {
+            response
+                .headers_mut()
+                .insert("x-present", HeaderValue::from_static("v1"));
+            response
+                .headers_mut()
+                .insert("x-empty", HeaderValue::from_static(""));
+        }
+        response
+    }));
+    let (upstream_addr, upstream_handle) = spawn_server(upstream_app).await;
+    let (data_addr, admin_addr, data_handle, admin_handle) = spawn_proxy(1024 * 1024).await;
+    let client = reqwest::Client::new();
+    let source = format!(
+        r#"
+        use http;
+
+        let upstream = http::exchange::default_upstream();
+        http::exchange::set_target(upstream, "127.0.0.1", {upstream_port});
+        http::exchange::set_path(upstream, http::request::get_path());
+        http::response::set_status(http::exchange::get_status(upstream));
+
+        let present = match http::exchange::get_header(upstream, "x-present") {{
+            Result::Ok(member) => match member {{
+                Option::Some(text) => "some:" + text,
+                Option::None => "none",
+            }},
+            Result::Err(error) => "error:" + error,
+        }};
+        let empty = match http::exchange::get_header(upstream, "x-empty") {{
+            Result::Ok(member) => match member {{
+                Option::Some(text) => "some:" + text,
+                Option::None => "none",
+            }},
+            Result::Err(error) => "error:" + error,
+        }};
+        let absent = match http::exchange::get_header(upstream, "x-absent") {{
+            Result::Ok(member) => match member {{
+                Option::Some(text) => "some:" + text,
+                Option::None => "none",
+            }},
+            Result::Err(error) => "error:" + error,
+        }};
+
+        http::response::set_header("x-exchange-present", present);
+        http::response::set_header("x-exchange-empty", empty);
+        http::response::set_header("x-exchange-absent", absent);
+        http::response::set_body(http::exchange::get_body(upstream));
+    "#,
+        upstream_port = upstream_addr.port()
+    );
+    let compiled = compile_source(&source).expect("exchange header source should compile");
+    let upload = upload_program(&client, admin_addr, &compiled.program).await;
+    assert_eq!(upload.status(), StatusCode::NO_CONTENT);
+
+    let present = client
+        .get(format!("http://{data_addr}/present"))
+        .send()
+        .await
+        .expect("present request should complete");
+    assert_eq!(present.status(), StatusCode::OK);
+    let present_headers = present.headers().clone();
+    let present_body = present.text().await.expect("present body should read");
+
+    let absent = client
+        .get(format!("http://{data_addr}/absent"))
+        .send()
+        .await
+        .expect("absent request should complete");
+    assert_eq!(absent.status(), StatusCode::OK);
+    let absent_headers = absent.headers().clone();
+    let absent_body = absent.text().await.expect("absent body should read");
+
+    assert_eq!(
+        present_headers
+            .get("x-exchange-present")
+            .and_then(|value| value.to_str().ok()),
+        Some("some:v1")
+    );
+    assert_eq!(
+        present_headers
+            .get("x-exchange-empty")
+            .and_then(|value| value.to_str().ok()),
+        Some("some:")
+    );
+    assert_eq!(
+        present_headers
+            .get("x-exchange-absent")
+            .and_then(|value| value.to_str().ok()),
+        Some("none")
+    );
+    assert_eq!(present_body, "exchange-header-body");
+
+    assert_eq!(
+        absent_headers
+            .get("x-exchange-present")
+            .and_then(|value| value.to_str().ok()),
+        Some("none")
+    );
+    assert_eq!(
+        absent_headers
+            .get("x-exchange-absent")
+            .and_then(|value| value.to_str().ok()),
+        Some("none")
+    );
+    assert_eq!(absent_body, "exchange-header-body");
+
+    upstream_handle.abort();
+    data_handle.abort();
+    admin_handle.abort();
+}
+
+/// Serves one chunked response whose trailer block carries `x-checksum`.
+async fn spawn_trailer_upstream() -> (SocketAddr, JoinHandle<()>) {
+    let listener = tokio::net::TcpListener::bind(loopback_addr(0))
+        .await
+        .expect("trailer listener should bind");
+    let addr = listener.local_addr().expect("trailer listener addr");
+    let handle = tokio::spawn(async move {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        loop {
+            let (mut stream, _) = listener.accept().await.expect("trailer accept");
+            tokio::spawn(async move {
+                let mut buffer = [0u8; 4096];
+                let _ = stream.read(&mut buffer).await;
+                stream
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+                    )
+                    .await
+                    .expect("trailer response head should write");
+                // 13 bytes of data ("trailer-body!") then the terminating
+                // chunk followed by the trailing header block.
+                stream
+                    .write_all(b"D\r\ntrailer-body!\r\n0\r\nX-Checksum: abc123\r\n\r\n")
+                    .await
+                    .expect("trailer body should write");
+                let _ = stream.shutdown().await;
+            });
+        }
+    });
+    (addr, handle)
+}
+
+/// End-to-end coverage for `http::response::get_trailer` when the upstream
+/// response ends with a trailer: the present value is `Ok(Some(text))`.
+#[tokio::test]
+async fn response_get_trailer_reports_a_present_upstream_trailer() {
+    let (upstream_addr, upstream_handle) = spawn_trailer_upstream().await;
+    let (data_addr, admin_addr, data_handle, admin_handle) = spawn_proxy(1024 * 1024).await;
+    let client = reqwest::Client::new();
+    let source = format!(
+        r#"
+        use http;
+
+        let upstream = http::exchange::default_upstream();
+        http::exchange::set_target(upstream, "127.0.0.1", {upstream_port});
+        http::exchange::set_path(upstream, "/trailers");
+        let status = http::exchange::get_status(upstream);
+
+        let checksum = match http::response::get_trailer("x-checksum") {{
+            Result::Ok(member) => match member {{
+                Option::Some(text) => text,
+                Option::None => "none",
+            }},
+            Result::Err(error) => "error:" + error,
+        }};
+        let absent_trailer = match http::response::get_trailer("x-not-sent") {{
+            Result::Ok(member) => match member {{
+                Option::Some(text) => text,
+                Option::None => "none",
+            }},
+            Result::Err(error) => "error:" + error,
+        }};
+
+        http::response::set_status(status);
+        http::response::set_header("x-trailer-checksum", checksum);
+        http::response::set_header("x-trailer-absent", absent_trailer);
+        http::response::set_body(http::exchange::get_body(upstream));
+    "#,
+        upstream_port = upstream_addr.port()
+    );
+    let compiled = compile_source(&source).expect("trailer source should compile");
+    let upload = upload_program(&client, admin_addr, &compiled.program).await;
+    assert_eq!(upload.status(), StatusCode::NO_CONTENT);
+
+    let response = client
+        .get(format!("http://{data_addr}/trailers"))
+        .send()
+        .await
+        .expect("trailer request should complete");
+    let status = response.status();
+    let headers = response.headers().clone();
+    let body = response.text().await.expect("trailer body should read");
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        headers
+            .get("x-trailer-checksum")
+            .and_then(|value| value.to_str().ok()),
+        Some("abc123")
+    );
+    assert_eq!(
+        headers
+            .get("x-trailer-absent")
+            .and_then(|value| value.to_str().ok()),
+        Some("none")
+    );
+    assert_eq!(body, "trailer-body!");
+
+    upstream_handle.abort();
+    data_handle.abort();
     admin_handle.abort();
 }

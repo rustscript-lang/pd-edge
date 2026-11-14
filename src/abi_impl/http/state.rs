@@ -2806,7 +2806,8 @@ mod tests {
 
         let line = read_request_body_next_line(&context)
             .await
-            .expect("line read should succeed");
+            .expect("line read should succeed")
+            .expect("the last line is present, not end of stream");
 
         assert_eq!(line.as_slice(), b"tail-without-newline");
 

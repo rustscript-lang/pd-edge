@@ -2866,7 +2866,7 @@ pub(crate) async fn read_outbound_exchange_response_next_chunk(
 
 pub(crate) async fn read_upstream_response_next_line(
     context: &SharedProxyVmContext,
-) -> Result<Vec<u8>, VmError> {
+) -> Result<Option<Vec<u8>>, VmError> {
     context.note_exchange_response_body_read(DEFAULT_UPSTREAM_EXCHANGE_HANDLE);
     let snapshot = ensure_upstream_response_started(context).await?;
     let body = snapshot.body;
@@ -2878,7 +2878,7 @@ pub(crate) async fn read_upstream_response_next_line(
 pub(crate) async fn read_outbound_exchange_response_next_line(
     context: &SharedProxyVmContext,
     handle: i64,
-) -> Result<Vec<u8>, VmError> {
+) -> Result<Option<Vec<u8>>, VmError> {
     context.note_exchange_response_body_read(handle);
     if handle == DEFAULT_UPSTREAM_EXCHANGE_HANDLE {
         return read_upstream_response_next_line(context).await;

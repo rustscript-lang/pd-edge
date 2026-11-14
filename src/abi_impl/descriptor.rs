@@ -105,7 +105,10 @@ pub(crate) fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
 /// Closed MQTT connection event: `publish` | `closed` | `failed`.
 ///
 /// Runtime values remain maps; the compiler catalog types the shape as a
-/// named struct so field access and `.has` stay exact.
+/// named struct so field access stays exact. Only `kind` exists on every
+/// variant, so every other member is `Option<T>`: a member that the active
+/// variant does not carry is the guest `Option::None`, never a member that is
+/// absent from the map and never an empty-string sentinel.
 pub(crate) fn mqtt_event_schema() -> HostTypeSchema {
     HostTypeSchema::named_struct(
         "MqttEvent",
@@ -113,31 +116,28 @@ pub(crate) fn mqtt_event_schema() -> HostTypeSchema {
             HostStructField::new("kind", HostTypeSchema::String),
             HostStructField::new(
                 "topic",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
             HostStructField::new(
                 "payload_text",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
             HostStructField::new(
                 "payload_base64",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
-            HostStructField::new(
-                "qos",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Int)),
-            ),
+            HostStructField::new("qos", HostTypeSchema::Option(Box::new(HostTypeSchema::Int))),
             HostStructField::new(
                 "retain",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::Bool)),
             ),
             HostStructField::new(
                 "dup",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::Bool)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::Bool)),
             ),
             HostStructField::new(
                 "reason",
-                HostTypeSchema::Optional(Box::new(HostTypeSchema::String)),
+                HostTypeSchema::Option(Box::new(HostTypeSchema::String)),
             ),
         ],
     )
@@ -313,8 +313,14 @@ fn resolve_edge_schema(
 ///
 /// - `io::*`: the runtime overrides the core IO builtins with edge-scoped
 ///   implementations (`EdgeHostScope::Io`), including helpers the standard
-///   catalog does not publish in every build (`io::exists`, `io::read_line`,
-///   `io::popen`, ...).
+///   catalog does not publish in every build (`io::exists`, `io::popen`, ...).
+///   An override must still encode the core contract the guest compiler
+///   resolves for that name: `io::read_all` is `Result<string, string>`,
+///   `io::read_line` is `Result<Option<string>, string>` (EOF is `Ok(None)`,
+///   a blank line is `Ok(Some(""))`), `io::write` is `Result<int, string>`, and
+///   `io::flush`/`io::close` are `Result<(), string>`. `io::open` is the one
+///   exception: core publishes `Result<io.file resource, string>` and the edge
+///   runtime can only return a raw virtual-handle `int`.
 /// - `http::request::body::*`: downstream request-body streaming helpers used
 ///   by the checked-in request-transform example, resolved dynamically by the
 ///   guest compiler (`arity`/`Unknown` imports).

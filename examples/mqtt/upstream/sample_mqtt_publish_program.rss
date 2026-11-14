@@ -150,26 +150,22 @@ if header_payload_hex != "" {
 
 if subscribe_filter != "" {
     let event = mqtt::connection::read_event(connection);
-    let mut kind: string = "unknown";
-    if (&event).has("kind") {
-        kind = (&event)["kind"];
-    }
+    let kind = event.kind;
     http::response::set_header("x-mqtt-event-kind", kind);
 
-    // The event map is dynamic; read each field into a string-typed local
-    // before handing it to a string-typed host parameter.
-    if (&event).has("topic") {
-        let event_topic: string = (&event)["topic"];
-        http::response::set_header("x-mqtt-event-topic", event_topic);
+    // `MqttEvent` is one strict closed record: `kind` is always present and
+    // every variant-specific member is `Option<T>`, so the guest asks whether
+    // the member is present instead of probing a dynamic map.
+    if option_present(event.topic.copy()) {
+        http::response::set_header("x-mqtt-event-topic", option_text(event.topic));
     }
 
-    if (&event).has("reason") {
-        let event_reason: string = (&event)["reason"];
+    if option_present(event.reason.copy()) {
+        let event_reason = option_text(event.reason);
         http::response::set_header("x-mqtt-event-reason", event_reason);
         http::response::set_body(event_reason);
-    } else if (&event).has("payload_text") {
-        let event_payload_text: string = (&event)["payload_text"];
-        http::response::set_body(event_payload_text);
+    } else if option_present(event.payload_text.copy()) {
+        http::response::set_body(option_text(event.payload_text));
     } else {
         http::response::set_body(kind);
     }
@@ -193,5 +189,21 @@ fn request_header_text(name: string) -> string {
             Option::None => "",
         },
         Result::Err(error) => "",
+    }
+}
+
+// Whether the `MqttEvent` member belongs to the active event variant.
+fn option_present(value: Option<string>) -> bool {
+    match value {
+        Option::Some(text) => true,
+        Option::None => false,
+    }
+}
+
+// The member text of an active variant; an absent member renders as "".
+fn option_text(value: Option<string>) -> string {
+    match value {
+        Option::Some(text) => text,
+        Option::None => "",
     }
 }

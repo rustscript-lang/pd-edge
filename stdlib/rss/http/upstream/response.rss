@@ -14,9 +14,10 @@ pub fn get_header(name: string) -> Result<Option<string>, string> {
     http::exchange::get_header(upstream_response_default_exchange(), name)
 }
 
-pub fn get_headers() -> map<string> {
-    http::exchange::get_headers(upstream_response_default_exchange())
-}
+// The open header map (`http::exchange::get_headers`) stays a deliberate
+// dynamic boundary in ABI 26, and the frozen compiler does not admit a dynamic
+// host output as a guest value, so this wrapper publishes no header-map getter.
+// Guests that need one header use the typed `get_header` contract above.
 
 pub fn get_body() -> string {
     http::exchange::get_body(upstream_response_default_exchange())
@@ -30,7 +31,11 @@ pub fn next_chunk(max_bytes: int) -> string {
     http::exchange::body::next_chunk(upstream_response_default_exchange(), max_bytes)
 }
 
-pub fn next_line() -> string {
+/// Reads the next line of the default exchange response.
+///
+/// `Ok(None)` is end of stream, `Ok(Some(""))` is a present blank line (the
+/// SSE event boundary), and the trailing `\n` is not part of the value.
+pub fn next_line() -> Result<Option<string>, string> {
     io::read_line(upstream_response_default_exchange())
 }
 
@@ -38,10 +43,14 @@ pub fn eof() -> bool {
     http::exchange::body::eof(upstream_response_default_exchange())
 }
 
-pub fn read_all() -> string {
+/// Reads the whole default exchange response body.
+///
+/// The text is the guest success value; a read failure is the guest error.
+pub fn read_all() -> Result<string, string> {
     io::read_all(upstream_response_default_exchange())
 }
 
-pub fn read_line() -> string {
+/// Reads the next line of the default exchange response (alias of `next_line`).
+pub fn read_line() -> Result<Option<string>, string> {
     io::read_line(upstream_response_default_exchange())
 }

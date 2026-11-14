@@ -63,10 +63,14 @@ fingerprint tag, so it is an explicit ABI-versioned change.
 
 | Function | Named schema | Runtime representation |
 |---|---|---|
-| `mqtt::connection::read_event` | `MqttEvent` (`kind` plus optional publish/close/fail fields) | map |
+| `mqtt::connection::read_event` | `MqttEvent`: always-present `kind` plus `Option<T>` for every variant-specific member | map with canonical `Option` carriers |
 
 Compile options install this catalog so the guest compiler sees the named
 contract. The coarse `pd-edge-abi` wire type for `read_event` remains `map`.
+A member the active variant does not carry is an explicit `Option::None`
+carrier, never a missing map entry and never a nullable (`optional<T>`) field:
+the frozen compiler rejects a nullable field on a host output and requires the
+canonical `Option` carrier for an absent member.
 
 Published ABI namespaces (`runtime`, `tcp`, `http`, …) are exact catalog
 modules. A guest file of the same name is not a host-namespace fallback;
@@ -90,6 +94,31 @@ The wire tag is `result_option_string`; the carrier is the canonical
 value is never an empty-string sentinel. An invalid header or trailer name
 stays a fatal host error. Fields that always exist (`method`, `path`, `uri`,
 `version`, `status`, ...) keep returning `string`/`int`.
+
+## Core IO readers overridden by the edge runtime (ABI version 26)
+
+`io::read_all` and `io::read_line` are edge overrides of core builtins: the
+runtime keeps its own handles, but the guest contract is the one the frozen
+compiler resolves from the core IO module. Both are published as explicit
+results:
+
+| Function | Guest contract |
+|---|---|
+| `io::read_all` | `Result<string, string>`: the remaining text, or the guest error |
+| `io::read_line` | `Result<Option<string>, string>`: `Ok(None)` at end of stream, `Ok(Some(""))` for a blank line, one trailing `\n` stripped |
+| `io::write` | `Result<int, string>`: bytes written |
+| `io::flush` | `Result<(), string>` |
+| `io::close` | `Result<(), string>` |
+
+A handle or transport failure stays a fatal host error. The embedded
+`http::upstream::response` wrapper propagates both text contracts (`next_line`,
+`read_line`, `read_all`) instead of collapsing them.
+
+`io::open` stays the one edge override whose value cannot match its core
+contract: core publishes `Result<io.file resource, string>`, while the edge
+runtime returns a raw virtual-handle `int` (see the raw-handle metadata
+family). Minting a core `io.file` resource is not possible from edge scope, so
+the open result keeps the raw token and no guest is currently typed against it.
 
 ## Intentional dynamic boundaries
 
