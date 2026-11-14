@@ -401,6 +401,16 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
+    async fn read_next_line_keeps_the_carriage_return_of_a_crlf_terminator() {
+        let lines = read_lines("a\r\nb").await;
+        assert_eq!(
+            lines,
+            vec![Some("a\r".to_string()), Some("b".to_string()), None],
+            "only the `\\n` delimiter is stripped; the `\\r` of a `\\r\\n` terminator stays in the line, matching the core reader"
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
     async fn read_next_line_reports_only_end_of_stream_for_an_empty_body() {
         let lines = read_lines("").await;
         assert_eq!(lines, vec![None]);
