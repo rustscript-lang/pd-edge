@@ -307,10 +307,12 @@ async fn io_read_all(
 /// Reads a single line of text from an I/O handle.
 ///
 /// Publishes the core `io::read_line` contract: `Ok(None)` is end of stream,
-/// `Ok(Some(""))` is a present blank line, `Ok(Some(text))` is a line with the
-/// trailing `\n` stripped, and `Err` is a handle or read failure that is not a
-/// line value. `io::read_line` overrides the core builtin, so it must encode
-/// exactly the contract the guest compiler resolves for that name.
+/// `Ok(Some(""))` is a present blank line, and `Ok(Some(text))` is a line with
+/// the trailing `\n` stripped (a preceding `\r` is kept, exactly as the core
+/// reader keeps it). A handle or transport failure is not a line value: it
+/// stays a fatal host error, so the guest never sees an `Err` here.
+/// `io::read_line` overrides the core builtin, so it must encode exactly the
+/// contract the guest compiler resolves for that name.
 #[pd_edge_host_function(name = "io::read_line", scope = io)]
 async fn io_read_line(
     _vm: &mut Vm,

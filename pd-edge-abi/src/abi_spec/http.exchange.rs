@@ -140,9 +140,16 @@ fn http_exchange_get_body(exchange: i64) -> String {
     unreachable!("abi declaration only")
 }
 
-/// Host function `http::exchange::get_trailer`.
+/// Returns the first trailer value for the outbound HTTP exchange.
+///
+/// `Ok(None)` means the exchange carries no such trailer, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid trailer name is a fatal host error.
 #[pd_host_function(name = "http::exchange::get_trailer")]
-fn http_exchange_get_trailer(exchange: i64, name: &str) -> String {
+fn http_exchange_get_trailer(
+    exchange: i64,
+    name: &str,
+) -> GuestResult<GuestOption<String>, String> {
     unreachable!("abi declaration only")
 }
 

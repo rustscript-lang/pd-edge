@@ -2,8 +2,9 @@
 use super::state::attach_outbound_exchange_tls_transport;
 use super::{
     helpers::{
-        headers_to_value_map, is_valid_request_path, optional_header_text, optional_text_result,
-        parse_header, parse_header_name, parse_string_header_batch, serialize_query_pairs,
+        headers_to_value_map, is_valid_request_path, optional_header_text, optional_text_outcome,
+        optional_text_result, parse_header, parse_header_name, parse_string_header_batch,
+        serialize_query_pairs,
     },
     state::{
         HttpUpstreamScheme, SharedProxyVmContext, allocate_outbound_exchange_handle,
@@ -15,7 +16,7 @@ use super::{
     version::HttpVersionPreference,
 };
 use crate::abi_impl::schedule_current_future_call;
-use axum::http::Method;
+use axum::http::{HeaderMap, Method};
 use edge_abi::symbols::http::exchange as http_exchange;
 use pd_edge_host_function::pd_edge_host_function;
 use vm::{CallOutcome, CallReturn, Value, Vm, VmError};
@@ -561,7 +562,25 @@ async fn get_exchange_body(
     ))))
 }
 
+/// Selects one trailer value from an outbound exchange trailer map.
+///
+/// An absent trailer is `Ok(None)`, a present trailer decodes to `Ok(Some(text))`
+/// even when the text is empty, a trailer that is not valid text is `Err`, and
+/// an invalid trailer name is a fatal host error rather than an absent trailer.
+fn exchange_trailer_value(
+    trailers: &HeaderMap,
+    name: &str,
+) -> Result<Result<Option<String>, String>, VmError> {
+    let header_name = axum::http::HeaderName::from_bytes(name.as_bytes())
+        .map_err(|_| VmError::HostError(format!("invalid trailer name '{name}'")))?;
+    Ok(optional_header_text(trailers.get(&header_name)))
+}
+
 /// Returns the first trailer value for the outbound HTTP exchange.
+///
+/// `Ok(None)` means the exchange carries no such trailer, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid trailer name is a fatal host error.
 #[pd_edge_host_function(name = "http::exchange::get_trailer", scope = http)]
 async fn get_exchange_trailer(
     _vm: &mut Vm,
@@ -569,17 +588,10 @@ async fn get_exchange_trailer(
     exchange: i64,
     name: String,
 ) -> Result<CallOutcome, VmError> {
-    let header_name = axum::http::HeaderName::from_bytes(name.as_bytes())
-        .map_err(|_| VmError::HostError(format!("invalid trailer name '{name}'")))?;
     let trailers = read_outbound_exchange_response_trailers(&context, exchange).await?;
-    let value = trailers
-        .get(&header_name)
-        .and_then(|value| value.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::string(
-        value,
-    ))))
+    Ok(optional_text_outcome(exchange_trailer_value(
+        &trailers, &name,
+    )?))
 }
 
 /// Returns all trailers on the outbound HTTP exchange as a map.
@@ -639,4 +651,73 @@ async fn get_exchange_body_eof(
 ) -> Result<CallOutcome, VmError> {
     let eof = outbound_exchange_response_eof(&context, exchange).await?;
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Bool(eof))))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::{HeaderMap, HeaderValue};
+
+    use super::*;
+    use crate::abi_impl::http::helpers::{decode_optional_text_result, optional_text_outcome};
+
+    fn trailer_value(bytes: &[u8]) -> HeaderValue {
+        HeaderValue::from_bytes(bytes).expect("trailer value bytes should be admissible")
+    }
+
+    /// Runs the real trailer selection through the real guest encoding.
+    fn exchange_trailer_return(trailers: &HeaderMap, name: &str) -> Result<Option<String>, String> {
+        let selected = exchange_trailer_value(trailers, name)
+            .expect("an admissible trailer name is not a fatal host error");
+        decode_optional_text_result(&optional_text_outcome(selected))
+    }
+
+    #[test]
+    fn exchange_get_trailer_absent_is_ok_none() {
+        let trailers = HeaderMap::new();
+        assert_eq!(
+            exchange_trailer_return(&trailers, "x-absent"),
+            Ok(None),
+            "an absent exchange trailer must be Ok(None), not an empty string"
+        );
+    }
+
+    #[test]
+    fn exchange_get_trailer_present_empty_is_ok_some_empty() {
+        let mut trailers = HeaderMap::new();
+        trailers.insert("x-empty", trailer_value(b""));
+        assert_eq!(
+            exchange_trailer_return(&trailers, "x-empty"),
+            Ok(Some(String::new())),
+            "a present empty exchange trailer must stay distinguishable from an absent one"
+        );
+    }
+
+    #[test]
+    fn exchange_get_trailer_invalid_text_is_err() {
+        let mut trailers = HeaderMap::new();
+        trailers.insert("x-binary", trailer_value(&[0x80, 0xff]));
+        match exchange_trailer_return(&trailers, "x-binary") {
+            Err(message) => assert!(
+                message.contains("not valid text"),
+                "the guest error must describe the decode failure: {message}"
+            ),
+            other => panic!(
+                "an exchange trailer value that is not text must be a guest error, got {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn exchange_get_trailer_invalid_name_is_fatal() {
+        let trailers = HeaderMap::new();
+        let error = exchange_trailer_value(&trailers, "not a trailer name")
+            .expect_err("an invalid trailer name must stay a fatal host error");
+        match error {
+            VmError::HostError(message) => assert!(
+                message.contains("invalid trailer name"),
+                "the host error must name the rejection: {message}"
+            ),
+            other => panic!("an invalid trailer name must be a host error, got {other:?}"),
+        }
+    }
 }

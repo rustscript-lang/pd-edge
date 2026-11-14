@@ -1,7 +1,7 @@
 # Edge host descriptor and effect migration
 
 This repository is pinned to the frozen RustScript descriptor core
-`b1d6cffede77f49410bf63525f30b9a46b02dc01` (a git dependency for `pd-vm` and
+`fc8b0c8179640a8ffe460a64b3690e35c2f7eb73` (a git dependency for `pd-vm` and
 `pd-host-function`). This note records how the edge host surface is derived
 after the migration, and which boundaries are intentionally *not* typed.
 
