@@ -1,10 +1,13 @@
 use super::{
-    helpers::{headers_to_value_map, query_to_value_map, request_path_with_query},
+    helpers::{
+        headers_to_value_map, optional_text_outcome, query_to_value_map, request_path_with_query,
+    },
     state::{
         SharedProxyVmContext, read_request_body_all, read_request_body_next_chunk,
         request_body_eof, schedule_downstream_http_handoff,
     },
 };
+use axum::http::HeaderName;
 use edge_abi::symbols::http::request as http_request;
 use pd_edge_host_function::pd_edge_host_function;
 use vm::{CallOutcome, CallReturn, Value, Vm, VmError};
@@ -157,14 +160,21 @@ fn get_request_http_version(context: SharedProxyVmContext) -> Result<CallOutcome
 }
 
 /// Returns the first value for a header on the downstream HTTP request.
+///
+/// `Ok(None)` means the request carries no such header, `Ok(Some(""))` means it
+/// carries it with an empty value, and `Err` reports a value that is not valid
+/// text. An invalid header name is a fatal host error.
 #[pd_edge_host_function(name = http_request::GET_HEADER.name, scope = http)]
-fn get_request_header(context: SharedProxyVmContext, name: &str) -> Result<CallOutcome, VmError> {
-    let value = context
-        .with_request_head(|request_head| request_head.lazy_headers().get_str(name))
-        .unwrap_or_default();
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::string(
-        value,
-    ))))
+fn get_request_header_impl(
+    context: SharedProxyVmContext,
+    name: &str,
+) -> Result<CallOutcome, VmError> {
+    let header_name = HeaderName::from_bytes(name.as_bytes())
+        .map_err(|_| VmError::HostError(format!("invalid header name '{name}'")))?;
+    let value = context.with_request_head(|request_head| {
+        request_head.lazy_headers().get_text(header_name.as_str())
+    });
+    Ok(optional_text_outcome(value))
 }
 
 /// Returns all headers on the downstream HTTP request as a map.
@@ -176,6 +186,9 @@ fn get_request_headers(context: SharedProxyVmContext) -> Result<CallOutcome, VmE
 }
 
 /// Returns a query parameter from the downstream HTTP request.
+///
+/// `Ok(None)` means the query string has no such parameter, `Ok(Some(""))`
+/// means it has one with an empty value; a repeated key keeps the first value.
 #[pd_edge_host_function(name = http_request::GET_QUERY_ARG.name, scope = http)]
 fn get_request_query_arg(
     context: SharedProxyVmContext,
@@ -183,18 +196,10 @@ fn get_request_query_arg(
 ) -> Result<CallOutcome, VmError> {
     let value = context.with_request_head(|request_head| {
         url::form_urlencoded::parse(request_head.query().as_bytes())
-            .find_map(|(key, value)| {
-                if key == name {
-                    Some(value.into_owned())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.into_owned())
     });
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::string(
-        value,
-    ))))
+    Ok(optional_text_outcome(Ok(value)))
 }
 
 /// Returns all query parameters from the downstream HTTP request as a map.
@@ -211,4 +216,125 @@ fn get_request_port(context: SharedProxyVmContext) -> Result<CallOutcome, VmErro
     Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(
         context.with_request_head(|request_head| request_head.port() as i64),
     ))))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use axum::body::Body;
+    use axum::http::{HeaderMap, HeaderValue, Method};
+
+    use super::*;
+    use crate::abi_impl::RateLimiterStore;
+    use crate::abi_impl::http::ProxyVmContext;
+    use crate::abi_impl::http::helpers::decode_optional_text_result;
+    use crate::abi_impl::http::state::{
+        HttpRequestContext, LazyRequestId, RequestPortField, RequestStringField,
+    };
+
+    fn test_context(query: &str, headers: HeaderMap) -> SharedProxyVmContext {
+        Arc::new(ProxyVmContext::from_http_request(
+            HttpRequestContext {
+                request_id: LazyRequestId::from_string("test-request".to_string()),
+                method: Method::GET,
+                path: RequestStringField::Static("/getters".to_string()),
+                query: RequestStringField::Static(query.to_string()),
+                http_version: RequestStringField::Static("1.1".to_string()),
+                port: RequestPortField::Static(80),
+                scheme: RequestStringField::Static("http".to_string()),
+                host: RequestStringField::Static("localhost".to_string()),
+                client_ip: RequestStringField::Static("127.0.0.1".to_string()),
+                body: Body::empty(),
+                headers: headers.into(),
+            },
+            Arc::new(RateLimiterStore::new()),
+        ))
+    }
+
+    fn header_value(bytes: &[u8]) -> HeaderValue {
+        HeaderValue::from_bytes(bytes).expect("header value bytes should be admissible")
+    }
+
+    #[test]
+    fn request_get_header_absent_is_ok_none() {
+        let context = test_context("", HeaderMap::new());
+        let outcome =
+            get_request_header_impl(context, "x-absent").expect("absent header is not fatal");
+        assert_eq!(
+            decode_optional_text_result(&outcome),
+            Ok(None),
+            "an absent request header must be Ok(None), not an empty string"
+        );
+    }
+
+    #[test]
+    fn request_get_header_present_empty_is_ok_some_empty() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-empty", header_value(b""));
+        let context = test_context("", headers);
+        let outcome =
+            get_request_header_impl(context, "x-empty").expect("empty header is not fatal");
+        assert_eq!(
+            decode_optional_text_result(&outcome),
+            Ok(Some(String::new())),
+            "a present empty request header must stay distinguishable from an absent one"
+        );
+    }
+
+    #[test]
+    fn request_get_header_invalid_text_is_err() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-binary", header_value(&[0x80, 0xff]));
+        let context = test_context("", headers);
+        let outcome =
+            get_request_header_impl(context, "x-binary").expect("decode error is a guest error");
+        match decode_optional_text_result(&outcome) {
+            Err(message) => assert!(
+                message.contains("not valid text"),
+                "the guest error must describe the decode failure: {message}"
+            ),
+            other => panic!("a header value that is not text must be a guest error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn request_get_header_invalid_name_is_fatal() {
+        let context = test_context("", HeaderMap::new());
+        let error = get_request_header_impl(context, "not a header name")
+            .expect_err("an invalid header name must stay a fatal host error");
+        assert!(
+            format!("{error}").contains("invalid header name"),
+            "the fatal error must name the invalid header: {error}"
+        );
+    }
+
+    #[test]
+    fn request_get_query_arg_repeated_key_keeps_the_first_value() {
+        let context = test_context("a=1&a=2&flag=", HeaderMap::new());
+
+        let repeated =
+            get_request_query_arg_impl(context.clone(), "a").expect("query arg is not fatal");
+        assert_eq!(
+            decode_optional_text_result(&repeated),
+            Ok(Some("1".to_string())),
+            "a repeated query key must keep the first value"
+        );
+
+        let empty =
+            get_request_query_arg_impl(context.clone(), "flag").expect("query arg is not fatal");
+        assert_eq!(
+            decode_optional_text_result(&empty),
+            Ok(Some(String::new())),
+            "a parameter with an empty value must be Ok(Some(\"\"))"
+        );
+
+        let absent =
+            get_request_query_arg_impl(context, "missing").expect("query arg is not fatal");
+        assert_eq!(
+            decode_optional_text_result(&absent),
+            Ok(None),
+            "an absent query parameter must be Ok(None)"
+        );
+    }
 }

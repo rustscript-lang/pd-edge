@@ -45,7 +45,7 @@ http::exchange::set_path(upstream, upstream_path);
 http::exchange::set_method(upstream, http::request::get_method());
 http::exchange::set_body(upstream, http::request::get_body());
 
-let request_content_type = http::request::get_header("content-type");
+let request_content_type = request_header_text("content-type");
 if request_content_type != "" {
     http::exchange::set_header(upstream, "content-type", request_content_type);
 }
@@ -53,7 +53,7 @@ if request_content_type != "" {
 let session = tls::session::from_socket(proxy_socket);
 http::exchange::attach_tls_plaintext(upstream, session);
 // Tests can opt out of verification when the upstream uses local certificates.
-if http::request::get_header("x-insecure-upstream") != "" {
+if request_header_text("x-insecure-upstream") != "" {
     tls::session::set_verify(session, false);
     tls::session::set_verify_hostname(session, false);
 }
@@ -80,4 +80,18 @@ if alpn != "" {
 let peer_name = tls::session::get_peer_name(session);
 if peer_name != "" {
     http::response::set_header("x-upstream-peer", peer_name);
+}
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
 }

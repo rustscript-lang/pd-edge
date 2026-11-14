@@ -55,7 +55,7 @@ Their descriptor schema is the observed parameter list with an untyped return â€
 exactly how the guest compiler represents such calls. They must not be moved
 into the published ABI without a versioned ABI change.
 
-## Named closed records (ABI version 25)
+## Named closed records (ABI version 26)
 
 Closed fixed-shape returns are overlayed as `HostTypeSchema::Named` on the
 compiler catalog. Runtime values remain maps. The overlay changes the catalog
@@ -72,9 +72,28 @@ Published ABI namespaces (`runtime`, `tcp`, `http`, â€¦) are exact catalog
 modules. A guest file of the same name is not a host-namespace fallback;
 local modules still compile when their namespace is not in the catalog.
 
+## Fallible optional-text getters (ABI version 26)
+
+A getter for a member that may be absent publishes
+`Result<Option<string>, string>` instead of returning an empty string:
+
+| Function | Guest contract |
+|---|---|
+| `http::request::get_header` | `Ok(None)` absent, `Ok(Some(""))` present-but-empty, `Err` value is not text |
+| `http::request::get_query_arg` | same; a repeated key keeps the first value |
+| `http::response::get_header` | same |
+| `http::response::get_trailer` | same |
+| `http::exchange::get_header` | same |
+
+The wire tag is `result_option_string`; the carrier is the canonical
+`Result`/`Option` map pair, so absence is never a bare Null and an undecodable
+value is never an empty-string sentinel. An invalid header or trailer name
+stays a fatal host error. Fields that always exist (`method`, `path`, `uri`,
+`version`, `status`, ...) keep returning `string`/`int`.
+
 ## Intentional dynamic boundaries
 
-The edge ABI is a published wire contract (ABI version 25, shared with the
+The edge ABI is a published wire contract (ABI version 26, shared with the
 `pd-edge-abi` crate the VM compiler links). The following stay dynamic and are
 pinned by an allowlist test. WebRTC has no map/any wire types.
 

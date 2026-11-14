@@ -434,8 +434,8 @@ fn assert_unresolved_protocol_imports_are_not_catalog_backed(
     );
 }
 
-fn assert_every_import_is_abi25_catalog_backed(compiled: &CompiledProgram, label: &str) {
-    assert_eq!(ABI_VERSION, 25, "{label}: published ABI must stay at 25");
+fn assert_every_import_is_abi26_catalog_backed(compiled: &CompiledProgram, label: &str) {
+    assert_eq!(ABI_VERSION, 26, "{label}: published ABI must stay at 26");
     let imports = &compiled.program.imports;
     let schemas = compiled.program.host_import_schemas();
     assert!(
@@ -451,21 +451,21 @@ fn assert_every_import_is_abi25_catalog_backed(compiled: &CompiledProgram, label
     for (import, schema) in imports.iter().zip(schemas) {
         let schema = schema.as_ref().unwrap_or_else(|| {
             panic!(
-                "{label}: {} must have Some(schema) from the ABI25 catalog",
+                "{label}: {} must have Some(schema) from the ABI26 catalog",
                 import.name
             )
         });
         assert_eq!(schema.name, import.name, "{label}");
         assert!(
             function_by_name(&import.name).is_some(),
-            "{label}: {} must resolve through exact ABI25 catalog lookup",
+            "{label}: {} must resolve through exact ABI26 catalog lookup",
             import.name
         );
         match fingerprint {
             None => fingerprint = Some(schema.fingerprint),
             Some(expected) => assert_eq!(
                 schema.fingerprint, expected,
-                "{label}: {} fingerprint drifted from the ABI25 catalog",
+                "{label}: {} fingerprint drifted from the ABI26 catalog",
                 import.name
             ),
         }
@@ -485,12 +485,12 @@ fn schema_for_import<'a>(compiled: &'a CompiledProgram, name: &str) -> &'a vm::H
         .host_import_schemas()
         .get(index)
         .and_then(Option::as_ref)
-        .unwrap_or_else(|| panic!("{name} must carry Some(schema) from the ABI25 catalog"))
+        .unwrap_or_else(|| panic!("{name} must carry Some(schema) from the ABI26 catalog"))
 }
 
 #[test]
-fn published_edge_abi_is_version_25() {
-    assert_eq!(ABI_VERSION, 25);
+fn published_edge_abi_is_version_26() {
+    assert_eq!(ABI_VERSION, 26);
 }
 
 #[cfg(all(feature = "http", not(feature = "mqtt"), not(feature = "webrtc")))]
@@ -547,7 +547,7 @@ fn mqtt_feature_publishes_named_mqtt_event_and_runtime_module() {
     assert_eq!(function.name, "mqtt::connection::read_event");
 
     let compiled = compile_example("examples/mqtt/upstream/sample_mqtt_publish_program.rss");
-    assert_every_import_is_abi25_catalog_backed(&compiled, "mqtt sample");
+    assert_every_import_is_abi26_catalog_backed(&compiled, "mqtt sample");
 
     let schema = schema_for_import(&compiled, "mqtt::connection::read_event");
     match &schema.return_type {
@@ -582,7 +582,7 @@ fn webrtc_imports_are_not_catalog_backed_without_webrtc_feature() {
 
 #[cfg(all(feature = "http", feature = "tls", feature = "websocket"))]
 #[test]
-fn representative_sources_carry_abi25_catalog_schemas() {
+fn representative_sources_carry_abi26_catalog_schemas() {
     let cases = [
         "examples/http/proxy/sample_proxy_program.rss",
         "examples/transport/tls/sample_transport_tls_handshake_program.rss",
@@ -592,7 +592,7 @@ fn representative_sources_carry_abi25_catalog_schemas() {
     ];
     for relative in cases {
         let compiled = compile_example(relative);
-        assert_every_import_is_abi25_catalog_backed(&compiled, relative);
+        assert_every_import_is_abi26_catalog_backed(&compiled, relative);
     }
 
     let udp = compile_inline(
@@ -602,7 +602,7 @@ fn representative_sources_carry_abi25_catalog_schemas() {
         udp::socket::new();
     "#,
     );
-    assert_every_import_is_abi25_catalog_backed(&udp, "udp inline");
+    assert_every_import_is_abi26_catalog_backed(&udp, "udp inline");
     assert!(
         udp.program
             .imports

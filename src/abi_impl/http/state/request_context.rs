@@ -360,6 +360,30 @@ impl LazyHttpHeaders {
         })
     }
 
+    /// Strictly decodes one request header value as guest text.
+    ///
+    /// `Ok(None)` is an absent header, a header present with an empty value is
+    /// `Ok(Some(String::new()))`, and a value that is not valid UTF-8 is an
+    /// error instead of an empty-string sentinel.
+    pub(crate) fn get_text(&self, name: &str) -> Result<Option<String>, String> {
+        if let Some(parsed) = self.inner.parsed.get() {
+            return crate::abi_impl::http::helpers::optional_header_text(parsed.get(name));
+        }
+        let Some(raw) = self.inner.raw.as_ref() else {
+            return Ok(None);
+        };
+        let Some(header) = raw
+            .iter()
+            .find(|header| header.name.as_ref().eq_ignore_ascii_case(name.as_bytes()))
+        else {
+            return Ok(None);
+        };
+        match std::str::from_utf8(&header.value) {
+            Ok(text) => Ok(Some(text.to_string())),
+            Err(error) => Err(format!("header value is not valid text: {error}")),
+        }
+    }
+
     pub(crate) fn contains_name(&self, name: &str) -> bool {
         if let Some(parsed) = self.inner.parsed.get() {
             return parsed.contains_key(name);

@@ -948,7 +948,13 @@ async fn proxy_pipe_forwards_dynamic_exchange_response_via_proxy_stream_handle()
         http::response::set_header("x-proxy-status", status);
         http::response::set_status(http::exchange::get_status(exchange));
 
-        let content_type = http::exchange::get_header(exchange, "content-type");
+        let content_type = match http::exchange::get_header(exchange, "content-type") {{
+            Result::Ok(present) => match present {{
+                Option::Some(text) => text,
+                Option::None => "",
+             }},
+            Result::Err(error) => "",
+        }};
         if content_type != "" {{
             http::response::set_header("content-type", content_type);
         }}

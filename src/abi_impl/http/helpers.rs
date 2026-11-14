@@ -8,7 +8,89 @@ use std::{
 use axum::http::{HeaderMap, HeaderName, HeaderValue};
 use parking_lot::Mutex;
 use vm::bytecode::VmMap;
-use vm::{Value, VmError};
+use vm::{CallOutcome, CallReturn, Value, VmError};
+
+/// Strictly decodes one optional header or trailer value as guest text.
+///
+/// `Ok(None)` is an absent member, a present value decodes to `Ok(Some(text))`
+/// even when the text is empty, and a value that is not valid text is an error
+/// instead of a silent empty string.
+pub(crate) fn optional_header_text(value: Option<&HeaderValue>) -> Result<Option<String>, String> {
+    match value {
+        None => Ok(None),
+        Some(value) => match value.to_str() {
+            Ok(text) => Ok(Some(text.to_string())),
+            Err(error) => Err(format!("header value is not valid text: {error}")),
+        },
+    }
+}
+
+/// Builds the guest value of a `Result<Option<string>, string>` edge getter.
+///
+/// The carrier is the core canonical union, never a bare Null and never an
+/// empty-string sentinel: an absent member is `Option::None`, a present member
+/// is `Option::Some(text)`, and a malformed member is the guest error.
+pub(crate) fn optional_text_result(value: Result<Option<String>, String>) -> Value {
+    match value {
+        Ok(Some(text)) => vm::result::carrier(true, vm::option::some_carrier(Value::string(text))),
+        Ok(None) => vm::result::carrier(true, vm::option::none_carrier()),
+        Err(message) => vm::result::carrier(false, Value::string(message)),
+    }
+}
+
+/// Wraps [`optional_text_result`] into the single-value host return.
+pub(crate) fn optional_text_outcome(value: Result<Option<String>, String>) -> CallOutcome {
+    CallOutcome::Return(CallReturn::one(optional_text_result(value)))
+}
+
+/// Reads the Boolean `tag` and active `payload` of one canonical carrier map.
+#[cfg(test)]
+fn carrier_fields(value: &Value) -> (bool, Option<Value>) {
+    let Value::Map(entries) = value else {
+        panic!("carrier must be a map, got {value:?}");
+    };
+    let tag = match entries.get(&Value::string("tag")) {
+        Some(Value::Bool(tag)) => *tag,
+        other => panic!("carrier must carry a Boolean tag, got {other:?}"),
+    };
+    (tag, entries.get(&Value::string("payload")).cloned())
+}
+
+/// Decodes a `Result<Option<string>, string>` edge getter return for assertions.
+///
+/// This is the test-side contract check: a return that is not the canonical
+/// two-level carrier fails here instead of being coerced.
+#[cfg(test)]
+pub(crate) fn decode_optional_text_result(outcome: &CallOutcome) -> Result<Option<String>, String> {
+    let values = match outcome {
+        CallOutcome::Return(values) => values.as_slice(),
+        other => panic!("edge getter must return a value, got {other:?}"),
+    };
+    assert_eq!(values.len(), 1, "edge getter returns exactly one value");
+    let (is_ok, payload) = carrier_fields(&values[0]);
+    if !is_ok {
+        return match payload {
+            Some(Value::String(message)) => Err(message.to_string()),
+            other => panic!("guest error payload must be text, got {other:?}"),
+        };
+    }
+    let (is_some, payload) = carrier_fields(
+        payload
+            .as_ref()
+            .unwrap_or_else(|| panic!("GuestResult::Ok must carry an Option payload")),
+    );
+    if !is_some {
+        assert!(
+            payload.is_none(),
+            "Option::None must not carry an active payload"
+        );
+        return Ok(None);
+    }
+    match payload {
+        Some(Value::String(text)) => Ok(Some(text.to_string())),
+        other => panic!("Option::Some payload must be text, got {other:?}"),
+    }
+}
 
 const HEADER_BATCH_CACHE_CAPACITY: usize = 256;
 

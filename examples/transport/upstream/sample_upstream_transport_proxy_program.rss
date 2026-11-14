@@ -6,7 +6,7 @@ use tls;
 // HTTP-runtime sample that proxies via transport-style upstream handles.
 //
 // This is distinct from:
-let upstream_scheme = http::request::get_header("x-upstream-scheme");
+let upstream_scheme = request_header_text("x-upstream-scheme");
 let upstream_host = if upstream_scheme == "https" => { "localhost" } else => { "127.0.0.1" };
 let upstream_port = if upstream_scheme == "https" => { 18485 } else => { 18085 };
 let upstream_path = "/echo";
@@ -45,13 +45,13 @@ if true {
     }
 
     let status = http::exchange::get_status(exchange);
-    let content_type = http::exchange::get_header(exchange, "content-type");
+    let content_type = exchange_header_text(exchange, "content-type");
     if content_type != "" {
         http::response::set_header("content-type", content_type);
     }
     http::response::set_status(status);
 
-    if http::request::get_header("Streaming") != "" {
+    if request_header_text("Streaming") != "" {
         // Stream the upstream response out incrementally after the exchange has started.
         http::response::stream::start();
         while !tcp::stream::eof(upstream) {
@@ -69,5 +69,33 @@ if true {
         }
         http::response::set_header("x-stream", "false");
         http::response::set_body(buffered);
+    }
+}
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}
+
+// `http::exchange::get_header` reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn exchange_header_text(exchange: int, name: string) -> string {
+    let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
     }
 }

@@ -21,7 +21,7 @@
 //!
 //! Closed records are overlayed as [`HostTypeSchema::Named`] on the compiler
 //! catalog. Runtime values remain maps. That overlay changes the catalog
-//! fingerprint tag, so it is an explicit ABI-versioned change (version 25).
+//! fingerprint tag, so it is an explicit ABI-versioned change (version 26).
 //!
 //! ## Intentional dynamic boundaries (allowlisted)
 //!
@@ -87,7 +87,7 @@ pub(crate) fn edge_param_type_schema(param: AbiParamType) -> HostTypeSchema {
 pub(crate) fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
     match value {
         AbiValueType::Unknown => HostTypeSchema::Unknown,
-        AbiValueType::Null => HostTypeSchema::Null,
+        AbiValueType::Unit => HostTypeSchema::Unit,
         AbiValueType::Int => HostTypeSchema::Int,
         AbiValueType::Float => HostTypeSchema::Float,
         AbiValueType::Bool => HostTypeSchema::Bool,
@@ -95,6 +95,10 @@ pub(crate) fn edge_return_type_schema(value: AbiValueType) -> HostTypeSchema {
         AbiValueType::Bytes => HostTypeSchema::Bytes,
         AbiValueType::Array => HostTypeSchema::Array(Box::new(HostTypeSchema::Unknown)),
         AbiValueType::Map => HostTypeSchema::Map(Box::new(HostTypeSchema::Unknown)),
+        AbiValueType::ResultOptionString => HostTypeSchema::Result {
+            ok: Box::new(HostTypeSchema::Option(Box::new(HostTypeSchema::String))),
+            err: Box::new(HostTypeSchema::String),
+        },
     }
 }
 

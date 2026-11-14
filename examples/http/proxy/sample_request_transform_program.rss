@@ -10,7 +10,7 @@ let exchange = http::exchange::default_upstream();
 http::exchange::set_target(exchange, upstream_host, upstream_port);
 http::exchange::set_path(exchange, upstream_path);
 
-if http::request::get_header("Chunk-Transform") != "" {
+if request_header_text("Chunk-Transform") != "" {
     // Consume the request stream incrementally and annotate each chunk before upload.
     let mut transformed = "";
     while !http::request::body::eof() {
@@ -29,3 +29,17 @@ let downstream = proxy::stream::downstream();
 let upstream_stream = proxy::stream::exchange(exchange);
 let proxy_status = proxy::forward_native(downstream, upstream_stream);
 http::response::set_header("x-proxy-status", proxy_status);
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}

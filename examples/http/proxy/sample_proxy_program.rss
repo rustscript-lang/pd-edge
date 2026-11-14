@@ -10,10 +10,10 @@ let exchange = http::exchange::default_upstream();
 http::exchange::set_target(exchange, upstream_host, upstream_port);
 http::exchange::set_path(exchange, upstream_path);
 
-if http::request::get_header("Streaming") != "" {
+if request_header_text("Streaming") != "" {
     // Accessing the response metadata/body implicitly executes the outbound exchange.
     let upstream_status = http::exchange::get_status(exchange);
-    let content_type = http::exchange::get_header(exchange, "content-type");
+    let content_type = exchange_header_text(exchange, "content-type");
     if content_type != "" {
         http::response::set_header("content-type", content_type);
     }
@@ -31,4 +31,30 @@ if http::request::get_header("Streaming") != "" {
     let upstream_stream = proxy::stream::exchange(exchange);
     let proxy_status = proxy::forward_native(downstream, upstream_stream);
     http::response::set_header("x-proxy-status", proxy_status);
+}
+
+// `http::request::get_header` reports absence and undecodable values instead of
+// returning an empty string. This sample only needs the value, so an absent
+// header and a malformed one both keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}
+
+// Same collapse for `http::exchange::get_header`.
+fn exchange_header_text(exchange: int, name: string) -> string {
+    let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
 }

@@ -582,7 +582,14 @@ async fn tiny_language_can_enforce_simple_rate_limit() {
         use http;
         use rate_limit;
 
-        if rate_limit::allow(http::request::get_header("x-client-id"), 2, 60) {
+        let client_id = match http::request::get_header("x-client-id") {
+            Result::Ok(present) => match present {
+                Option::Some(text) => text,
+                Option::None => "",
+             },
+            Result::Err(error) => "",
+        };
+        if rate_limit::allow(client_id, 2, 60) {
             http::response::set_header("x-vm", "allowed");
             http::response::set_body("ok");
         } else {
@@ -673,7 +680,13 @@ async fn http_prefixed_host_abi_can_rewrite_request_and_short_circuit() {
         use http;
         use rate_limit;
 
-        let client_id = http::request::get_header("x-client-id");
+        let client_id = match http::request::get_header("x-client-id") {{
+            Result::Ok(present) => match present {{
+                Option::Some(text) => text,
+                Option::None => "",
+             }},
+            Result::Err(error) => "",
+        }};
         if rate_limit::allow(client_id, 1, 60) {{
             let upstream = http::exchange::default_upstream();
             http::exchange::set_path(upstream, "/rewritten");

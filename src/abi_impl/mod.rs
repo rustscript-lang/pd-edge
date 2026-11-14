@@ -11,7 +11,8 @@ use std::{
 use edge_abi::FUNCTIONS as EDGE_ABI_FUNCTIONS;
 use tokio::sync::oneshot;
 use vm::{
-    CallOutcome, CallReturn, HostAsyncBridge, HostOpId, HostStackFunction, Value, Vm, VmError,
+    CallOutcome, CallReturn, HostAsyncBridge, HostAsyncOpTerminal, HostFutureOutput, HostOpId,
+    HostStackFunction, Value, Vm, VmError,
 };
 
 use crate::lock_metrics::{self, LockMetricKey, ProfiledMutexGuard};
@@ -231,6 +232,13 @@ impl VmAsyncOps {
             }
         }
     }
+
+    /// Drops the bridge state of one operation after the VM reported a
+    /// terminal outcome. Dropping the pending future is the cancellation: the
+    /// executor never resumes it, so no work survives the operation.
+    fn cleanup_op(&mut self, op_id: HostOpId) {
+        self.pending.remove(&op_id);
+    }
 }
 
 #[derive(Default)]
@@ -263,6 +271,29 @@ impl HostAsyncBridge for VmAsyncOpBridge {
     fn poll_op(&mut self, op_id: HostOpId, cx: &mut Context<'_>) -> Poll<AsyncOpResult> {
         let mut guard = self.ops.lock_ops();
         guard.poll_op(op_id, cx)
+    }
+
+    /// Every edge host operation is scheduled through [`VmAsyncOps`] and
+    /// polled by [`poll_op`](Self::poll_op); the bridge never accepts a
+    /// VM-submitted future, so there is nothing to poll here.
+    fn poll_submitted_op(
+        &mut self,
+        op_id: HostOpId,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<HostFutureOutput, VmError>> {
+        Poll::Ready(Err(VmError::HostError(format!(
+            "edge async host bridge owns no submitted future for op {op_id}",
+        ))))
+    }
+
+    fn cleanup_op(
+        &mut self,
+        op_id: HostOpId,
+        _terminal: HostAsyncOpTerminal,
+    ) -> Result<(), VmError> {
+        let mut guard = self.ops.lock_ops();
+        guard.cleanup_op(op_id);
+        Ok(())
     }
 }
 
@@ -884,7 +915,10 @@ mod tests {
     #[cfg(feature = "http")]
     struct TestNoopWake;
 
+    // The store drives this test waker through an `Arc`, so it cannot be
+    // replaced by `Waker::noop()` without changing the helper's ownership.
     #[cfg(feature = "http")]
+    #[allow(clippy::manual_noop_waker)]
     impl Wake for TestNoopWake {
         fn wake(self: Arc<Self>) {}
     }

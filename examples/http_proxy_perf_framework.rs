@@ -135,8 +135,20 @@ use http;
 
 let method = http::request::get_method();
 let path = http::request::get_path();
-let client_id = http::request::get_header("x-client-id");
-let request_body_mode = http::request::get_header("x-bench-body-mode");
+let client_id = match http::request::get_header("x-client-id") {{
+    Result::Ok(present) => match present {{
+        Option::Some(text) => text,
+        Option::None => "",
+     }},
+    Result::Err(error) => "",
+}};
+let request_body_mode = match http::request::get_header("x-bench-body-mode") {{
+    Result::Ok(present) => match present {{
+        Option::Some(text) => text,
+        Option::None => "",
+     }},
+    Result::Err(error) => "",
+}};
 
 if (acc % 2) == 0 {{
     http::response::set_header("x-perf-acc", "even");

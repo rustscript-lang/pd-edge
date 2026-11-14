@@ -1,7 +1,9 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AbiValueType {
     Unknown,
-    Null,
+    /// Guest `()`: the function returns no value. Its physical carrier is the
+    /// VM's internal Null, but the guest schema is Unit, never a nullable value.
+    Unit,
     Int,
     Float,
     Bool,
@@ -9,13 +11,20 @@ pub enum AbiValueType {
     Bytes,
     Array,
     Map,
+    /// Guest `Result<Option<string>, string>`.
+    ///
+    /// `Ok(None)` means the member is absent, `Ok(Some(""))` means it is
+    /// present with an empty value, and `Err(message)` carries the text of a
+    /// member whose value is not valid text. Fatal failures stay fatal VM
+    /// errors and are never encoded here.
+    ResultOptionString,
 }
 
 impl AbiValueType {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
-            Self::Null => "null",
+            Self::Unit => "unit",
             Self::Int => "int",
             Self::Float => "float",
             Self::Bool => "bool",
@@ -23,6 +32,7 @@ impl AbiValueType {
             Self::Bytes => "bytes",
             Self::Array => "array",
             Self::Map => "map",
+            Self::ResultOptionString => "result_option_string",
         }
     }
 }
@@ -75,7 +85,7 @@ pub struct HostNamespaceSpec {
     pub docs: &'static str,
 }
 
-pub const ABI_VERSION: u16 = 25;
+pub const ABI_VERSION: u16 = 26;
 
 #[allow(dead_code, unused_variables)]
 mod callable_specs {
@@ -99,6 +109,7 @@ mod callable_specs {
     #[allow(unused_imports)]
     use self::marker::{Any, Array, Bytes, Map, Value};
     use pd_host_function::pd_host_function;
+    use vm::{GuestOption, GuestResult};
 
     include!("abi_spec/functions.rs");
 }
@@ -170,7 +181,7 @@ mod tests {
     #[test]
     fn abi_json_contains_declared_functions() {
         let manifest = abi_json();
-        assert!(manifest.contains("\"abi_version\": 25"));
+        assert!(manifest.contains("\"abi_version\": 26"));
         for function in FUNCTIONS {
             assert!(manifest.contains(function.name));
             assert!(manifest.contains(function.return_type.as_str()));

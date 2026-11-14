@@ -64,9 +64,13 @@ fn http_response_get_body() -> String {
     unreachable!("abi declaration only")
 }
 
-/// Host function `http::response::get_trailer`.
+/// Returns the first trailer value for the downstream HTTP response.
+///
+/// `Ok(None)` means the response carries no such trailer, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid trailer name is a fatal host error.
 #[pd_host_function(name = "http::response::get_trailer")]
-fn http_response_get_trailer(name: &str) -> String {
+fn http_response_get_trailer(name: &str) -> GuestResult<GuestOption<String>, String> {
     unreachable!("abi declaration only")
 }
 
@@ -76,9 +80,13 @@ fn http_response_get_trailers() -> Map {
     unreachable!("abi declaration only")
 }
 
-/// Host function `http::response::get_header`.
+/// Returns the first value for a header on the downstream HTTP response.
+///
+/// `Ok(None)` means the response carries no such header, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid header name is a fatal host error.
 #[pd_host_function(name = "http::response::get_header")]
-fn http_response_get_header(name: &str) -> String {
+fn http_response_get_header(name: &str) -> GuestResult<GuestOption<String>, String> {
     unreachable!("abi declaration only")
 }
 

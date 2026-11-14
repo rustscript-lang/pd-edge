@@ -162,7 +162,7 @@ fn parse_function_decl(
         param_names,
         param_types,
         return_type: match &function.sig.output {
-            ReturnType::Default => "Null".to_string(),
+            ReturnType::Default => "Unit".to_string(),
             ReturnType::Type(_, ty) => type_label(ty),
         },
         docs,
@@ -405,7 +405,7 @@ fn type_label(ty: &Type) -> String {
         Type::Group(group) => type_label(&group.elem),
         Type::Paren(paren) => type_label(&paren.elem),
         Type::Reference(reference) => type_label(&reference.elem),
-        Type::Tuple(tuple) if tuple.elems.is_empty() => "Null".to_string(),
+        Type::Tuple(tuple) if tuple.elems.is_empty() => "Unit".to_string(),
         Type::Path(path) => {
             let Some(segment) = path.path.segments.last() else {
                 panic!("unsupported callable type");
@@ -423,6 +423,10 @@ fn type_label(ty: &Type) -> String {
                 "Map" | "VmMap" => "Map".to_string(),
                 "Number" => "Number".to_string(),
                 "Unknown" => "Unknown".to_string(),
+                "GuestResult" => {
+                    guest_result_option_string(segment);
+                    "ResultOptionString".to_string()
+                }
                 "Option" => {
                     let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
                         panic!("Option<T> requires one generic argument");
@@ -445,6 +449,43 @@ fn type_label(ty: &Type) -> String {
             }
         }
         _ => panic!("unsupported callable type"),
+    }
+}
+
+/// Requires the exact `GuestResult<GuestOption<String>, String>` return shape.
+///
+/// The edge ABI publishes exactly one fallible optional-text return: absence is
+/// a guest `Option::None`, an empty value is `Option::Some("")`, and a member
+/// that is not valid text is the guest error. Any other `GuestResult` shape is
+/// rejected here so the published manifest can never mislabel a wider contract.
+fn guest_result_option_string(segment: &syn::PathSegment) {
+    let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {
+        panic!("GuestResult<T, E> requires two generic arguments");
+    };
+    let mut arguments = args.args.iter();
+    let (Some(syn::GenericArgument::Type(ok)), Some(syn::GenericArgument::Type(err)), None) =
+        (arguments.next(), arguments.next(), arguments.next())
+    else {
+        panic!("GuestResult<T, E> requires exactly two type arguments");
+    };
+    let Type::Path(ok_path) = ok else {
+        panic!("GuestResult Ok type must be GuestOption<String>");
+    };
+    let Some(ok_segment) = ok_path.path.segments.last() else {
+        panic!("GuestResult Ok type must be GuestOption<String>");
+    };
+    if ok_segment.ident != "GuestOption" {
+        panic!("GuestResult Ok type must be GuestOption<String>");
+    }
+    let syn::PathArguments::AngleBracketed(ok_args) = &ok_segment.arguments else {
+        panic!("GuestOption<T> requires one generic argument");
+    };
+    match (&ok_args.args.len(), ok_args.args.first()) {
+        (1, Some(syn::GenericArgument::Type(inner))) if type_label(inner) == "String" => {}
+        _ => panic!("GuestResult Ok type must be GuestOption<String>"),
+    }
+    if type_label(err) != "String" {
+        panic!("GuestResult error type must be String");
     }
 }
 
@@ -753,10 +794,30 @@ fn render_abi_rust(functions: &[AbiFunctionDecl], namespaces: &[NamespaceDecl]) 
     out
 }
 
+/// Renders a Rust type label as the manifest's lowercase wire tag.
+///
+/// Single-word labels are unchanged (`Int` → `int`, `Map` → `map`), while a
+/// multi-word label keeps its word boundary so the published tag stays exact
+/// (`ResultOptionString` → `result_option_string`).
+fn manifest_type_tag(label: &str) -> String {
+    let mut out = String::new();
+    for (index, ch) in label.chars().enumerate() {
+        if ch.is_ascii_uppercase() {
+            if index > 0 {
+                out.push('_');
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 fn render_abi_json(functions: &[AbiFunctionDecl]) -> String {
     let mut out = String::new();
     out.push_str("{\n");
-    out.push_str("  \"abi_version\": 25,\n");
+    out.push_str("  \"abi_version\": 26,\n");
     out.push_str("  \"functions\": [\n");
     for (index, function) in functions.iter().enumerate() {
         let suffix = if index + 1 == functions.len() {
@@ -771,7 +832,7 @@ fn render_abi_json(functions: &[AbiFunctionDecl]) -> String {
             .map(|(name, ty)| {
                 format!(
                     "{{\"name\": {name:?}, \"type\": {:?}}}",
-                    ty.to_ascii_lowercase()
+                    manifest_type_tag(ty)
                 )
             })
             .collect::<Vec<_>>()
@@ -782,7 +843,7 @@ fn render_abi_json(functions: &[AbiFunctionDecl]) -> String {
             function.name,
             function.param_names.len(),
             params,
-            function.return_type.to_ascii_lowercase(),
+            manifest_type_tag(&function.return_type),
             function.docs
         )
         .unwrap();

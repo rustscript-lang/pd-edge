@@ -68,7 +68,7 @@ if argc == 0 {
     console::stdout::write("http-version=" + http::exchange::get_http_version(exchange) + "\n");
     console::stdout::write("alpn=" + tls::session::get_alpn(session) + "\n");
 
-    let content_type = http::exchange::get_header(exchange, "content-type");
+    let content_type = exchange_header_text(exchange, "content-type");
     if content_type != "" {
         console::stdout::write("content-type=" + content_type + "\n");
     }
@@ -77,4 +77,18 @@ if argc == 0 {
     console::stdout::write(http::exchange::get_body(exchange));
     console::stdout::write("\n");
     console::stdout::flush();
+}
+
+// `http::exchange::get_header` reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn exchange_header_text(exchange: int, name: string) -> string {
+    let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
 }

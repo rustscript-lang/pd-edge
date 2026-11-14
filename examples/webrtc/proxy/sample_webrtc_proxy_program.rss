@@ -8,11 +8,11 @@ use webrtc;
 // - x-webrtc-handle: "default" to use webrtc::connection::default_upstream(), otherwise webrtc::connection::new()
 // - x-webrtc-data-channel-label: optional data channel label; defaults to "sample-channel"
 // - x-webrtc-ice-servers: optional comma-separated ICE server URLs
-let text_payload = http::request::get_header("x-webrtc-message");
-let binary_payload_hex = http::request::get_header("x-webrtc-binary-hex");
-let requested_handle = http::request::get_header("x-webrtc-handle");
-let mut data_channel_label = http::request::get_header("x-webrtc-data-channel-label");
-let ice_servers = http::request::get_header("x-webrtc-ice-servers");
+let text_payload = request_header_text("x-webrtc-message");
+let binary_payload_hex = request_header_text("x-webrtc-binary-hex");
+let requested_handle = request_header_text("x-webrtc-handle");
+let mut data_channel_label = request_header_text("x-webrtc-data-channel-label");
+let ice_servers = request_header_text("x-webrtc-ice-servers");
 let signal_host = "127.0.0.1";
 let signal_port = if binary_payload_hex != "" || requested_handle == "default" => { 18088 } else => { 18087 };
 let signal_path = "/offer";
@@ -99,5 +99,19 @@ if true {
         http::response::set_header("x-webrtc-eof-after-close", "true");
     } else {
         http::response::set_header("x-webrtc-eof-after-close", "false");
+    }
+}
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
     }
 }

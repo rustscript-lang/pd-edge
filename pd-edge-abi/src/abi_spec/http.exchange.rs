@@ -118,9 +118,13 @@ fn http_exchange_get_status(exchange: i64) -> i64 {
     unreachable!("abi declaration only")
 }
 
-/// Host function `http::exchange::get_header`.
+/// Returns the first value for a header on the outbound HTTP exchange.
+///
+/// `Ok(None)` means the exchange carries no such header, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid header name is a fatal host error.
 #[pd_host_function(name = "http::exchange::get_header")]
-fn http_exchange_get_header(exchange: i64, name: &str) -> String {
+fn http_exchange_get_header(exchange: i64, name: &str) -> GuestResult<GuestOption<String>, String> {
     unreachable!("abi declaration only")
 }
 

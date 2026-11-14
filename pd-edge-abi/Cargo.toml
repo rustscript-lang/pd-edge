@@ -22,7 +22,11 @@ websocket = ["http"]
 webrtc = ["http"]
 
 [dependencies]
-pd-host-function = { git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", version = "0.1.0" }
+pd-host-function = { git = "https://github.com/rustscript-lang/rustscript.git", rev = "fc8b0c8179640a8ffe460a64b3690e35c2f7eb73", version = "0.1.0" }
+# The ABI declarations are real Rust signatures of the guest contract, so the
+# fallible optional-text return needs the core SDK's `GuestResult`/`GuestOption`
+# value types. The pin must match the runtime's `pd-vm` pin in the root manifest.
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "fc8b0c8179640a8ffe460a64b3690e35c2f7eb73", version = "0.1.0", default-features = false, features = ["runtime"] }
 
 [build-dependencies]
 syn = { version = "2", features = ["full"] }
