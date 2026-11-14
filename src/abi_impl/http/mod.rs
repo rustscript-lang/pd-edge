@@ -1,7 +1,7 @@
 #[cfg(feature = "http")]
 pub(crate) mod exchange;
 pub(crate) mod fast_path;
-mod helpers;
+pub(crate) mod helpers;
 pub(crate) mod outbound_http1;
 #[cfg(feature = "http")]
 mod request;

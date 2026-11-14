@@ -99,12 +99,15 @@ fn read_edge_virtual_handle_all(context: &ProxyVmContext, handle: i64) -> Result
     }
 }
 
-fn read_edge_virtual_handle_line(context: &ProxyVmContext, handle: i64) -> Result<String, VmError> {
+fn read_edge_virtual_handle_line(
+    context: &ProxyVmContext,
+    handle: i64,
+) -> Result<Option<String>, VmError> {
     match context.lock_edge_io().handles.get_mut(&handle) {
         Some(EdgeVirtualIoHandle::BufferedRead { text, offset }) => {
             let start = (*offset).min(text.len());
             if start >= text.len() {
-                return Ok(String::new());
+                return Ok(None);
             }
             let bytes = text.as_bytes();
             let mut end = start;
@@ -116,7 +119,7 @@ fn read_edge_virtual_handle_line(context: &ProxyVmContext, handle: i64) -> Resul
                 end += 1;
             }
             *offset = end;
-            Ok(line)
+            Ok(Some(line))
         }
         Some(EdgeVirtualIoHandle::FileWrite { .. }) => Err(VmError::HostError(format!(
             "edge io handle {handle} is write-only",
@@ -200,28 +203,26 @@ async fn read_io_target_all(
     }
 }
 
+/// Reads one line from a protocol-backed handle.
+///
+/// `Ok(None)` is end of stream, `Ok(Some(""))` is a present blank line, and
+/// the trailing `\n` is stripped by the underlying line reader.
 async fn read_io_target_line(
     context: &SharedProxyVmContext,
     target: EdgeProtocolIoHandle,
-) -> Result<String, VmError> {
-    match target {
-        EdgeProtocolIoHandle::Downstream => {
-            let line = read_request_body_next_line(context).await?;
-            Ok(String::from_utf8_lossy(&line).into_owned())
-        }
+) -> Result<Option<String>, VmError> {
+    let line = match target {
+        EdgeProtocolIoHandle::Downstream => read_request_body_next_line(context).await?,
         EdgeProtocolIoHandle::OutboundExchange(handle)
             if handle == default_upstream_exchange_handle() =>
         {
-            Ok(
-                String::from_utf8_lossy(&read_upstream_response_next_line(context).await?)
-                    .into_owned(),
-            )
+            read_upstream_response_next_line(context).await?
         }
-        EdgeProtocolIoHandle::OutboundExchange(handle) => Ok(String::from_utf8_lossy(
-            &read_outbound_exchange_response_next_line(context, handle).await?,
-        )
-        .into_owned()),
-    }
+        EdgeProtocolIoHandle::OutboundExchange(handle) => {
+            read_outbound_exchange_response_next_line(context, handle).await?
+        }
+    };
+    Ok(line.map(|bytes| String::from_utf8_lossy(&bytes).into_owned()))
 }
 
 fn write_io_target(
@@ -286,6 +287,9 @@ async fn io_popen(_vm: &mut Vm, _command: String, _mode: String) -> Result<CallO
 }
 
 /// Reads all remaining text from an I/O handle.
+///
+/// Publishes the core `io::read_all` contract: the text is the guest success
+/// value, and a handle or transport failure stays a fatal host error.
 #[pd_edge_host_function(name = "io::read_all", scope = io)]
 async fn io_read_all(
     _vm: &mut Vm,
@@ -297,12 +301,16 @@ async fn io_read_all(
         EdgeIoReadSource::Protocol(target) => read_io_target_all(&context, target).await?,
         EdgeIoReadSource::VirtualHandle(handle) => read_edge_virtual_handle_all(&context, handle)?,
     };
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::string(
-        text,
-    ))))
+    Ok(super::http::helpers::text_result_outcome(Ok(text)))
 }
 
 /// Reads a single line of text from an I/O handle.
+///
+/// Publishes the core `io::read_line` contract: `Ok(None)` is end of stream,
+/// `Ok(Some(""))` is a present blank line, `Ok(Some(text))` is a line with the
+/// trailing `\n` stripped, and `Err` is a handle or read failure that is not a
+/// line value. `io::read_line` overrides the core builtin, so it must encode
+/// exactly the contract the guest compiler resolves for that name.
 #[pd_edge_host_function(name = "io::read_line", scope = io)]
 async fn io_read_line(
     _vm: &mut Vm,
@@ -314,9 +322,9 @@ async fn io_read_line(
         EdgeIoReadSource::Protocol(target) => read_io_target_line(&context, target).await?,
         EdgeIoReadSource::VirtualHandle(handle) => read_edge_virtual_handle_line(&context, handle)?,
     };
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::string(
-        text,
-    ))))
+    // The read itself succeeded, so the guest sees the optional line value;
+    // a handle or transport failure above stays a fatal host error.
+    Ok(super::http::helpers::optional_text_outcome(Ok(text)))
 }
 
 /// Writes text to an I/O handle.
@@ -334,12 +342,13 @@ async fn io_write(
             write_edge_file_path(&path, append, &text).await?;
         }
     }
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::Int(
-        text.len() as i64,
-    ))))
+    Ok(super::http::helpers::int_result_outcome(text.len() as i64))
 }
 
 /// Flushes buffered output for an I/O handle.
+///
+/// Publishes the core `io::flush` contract: a unit success value, and an
+/// invalid handle stays a fatal host error.
 #[pd_edge_host_function(name = "io::flush", scope = io)]
 async fn io_flush(
     _vm: &mut Vm,
@@ -358,10 +367,13 @@ async fn io_flush(
         Value::String(_) => return Err(requires_io_handle_error("io::flush")),
         _ => return Err(VmError::TypeMismatch("int")),
     }
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::Bool(true))))
+    Ok(super::http::helpers::unit_result_outcome())
 }
 
 /// Closes an I/O handle.
+///
+/// Publishes the core `io::close` contract: a unit success value, and an
+/// invalid handle stays a fatal host error.
 #[pd_edge_host_function(name = "io::close", scope = io)]
 async fn io_close(
     _vm: &mut Vm,
@@ -371,7 +383,7 @@ async fn io_close(
     match target {
         Value::Int(handle) => {
             if decode_protocol_io_handle(&context, handle).is_some() {
-                return Ok(CallOutcome::Return(vm::CallReturn::one(Value::Bool(true))));
+                return Ok(super::http::helpers::unit_result_outcome());
             }
             if context.lock_edge_io().handles.remove(&handle).is_none() {
                 return Err(invalid_io_handle_error(handle));
@@ -380,7 +392,7 @@ async fn io_close(
         Value::String(_) => return Err(requires_io_handle_error("io::close")),
         _ => return Err(VmError::TypeMismatch("int")),
     }
-    Ok(CallOutcome::Return(vm::CallReturn::one(Value::Bool(true))))
+    Ok(super::http::helpers::unit_result_outcome())
 }
 
 /// Returns whether a file system path exists.

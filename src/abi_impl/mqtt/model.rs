@@ -110,7 +110,19 @@ pub(crate) enum MqttEvent {
 }
 
 impl MqttEvent {
+    /// Encodes the event as the closed `MqttEvent` record.
+    ///
+    /// Every published member is always present. A member the active variant
+    /// does not carry is the canonical guest `Option::None` carrier, so a
+    /// guest distinguishes "this variant has no topic" from "the topic is the
+    /// empty string" without relying on a missing map entry.
     pub(crate) fn into_value(self) -> Value {
+        fn some(value: Value) -> Value {
+            vm::option::some_carrier(value)
+        }
+        fn none() -> Value {
+            vm::option::none_carrier()
+        }
         match self {
             Self::Publish {
                 topic,
@@ -120,29 +132,43 @@ impl MqttEvent {
                 dup,
             } => Value::map(vec![
                 (Value::string("kind"), Value::string("publish")),
-                (Value::string("topic"), Value::string(topic)),
+                (Value::string("topic"), some(Value::string(topic))),
                 (
                     Value::string("payload_text"),
-                    Value::string(String::from_utf8_lossy(&payload).into_owned()),
+                    some(Value::string(
+                        String::from_utf8_lossy(&payload).into_owned(),
+                    )),
                 ),
                 (
                     Value::string("payload_base64"),
-                    Value::string(STANDARD.encode(payload)),
+                    some(Value::string(STANDARD.encode(payload))),
                 ),
-                (Value::string("qos"), Value::Int(i64::from(qos))),
-                (Value::string("retain"), Value::Bool(retain)),
-                (Value::string("dup"), Value::Bool(dup)),
+                (Value::string("qos"), some(Value::Int(i64::from(qos)))),
+                (Value::string("retain"), some(Value::Bool(retain))),
+                (Value::string("dup"), some(Value::Bool(dup))),
+                (Value::string("reason"), none()),
             ]),
-            Self::Closed { reason } => Value::map(vec![
-                (Value::string("kind"), Value::string("closed")),
-                (Value::string("reason"), Value::string(reason)),
-            ]),
-            Self::Failed { reason } => Value::map(vec![
-                (Value::string("kind"), Value::string("failed")),
-                (Value::string("reason"), Value::string(reason)),
-            ]),
+            Self::Closed { reason } => closed_event_value("closed", reason),
+            Self::Failed { reason } => closed_event_value("failed", reason),
         }
     }
+}
+
+/// Encodes one reason-only event (`closed` | `failed`) as the closed record.
+fn closed_event_value(kind: &str, reason: String) -> Value {
+    Value::map(vec![
+        (Value::string("kind"), Value::string(kind)),
+        (Value::string("topic"), vm::option::none_carrier()),
+        (Value::string("payload_text"), vm::option::none_carrier()),
+        (Value::string("payload_base64"), vm::option::none_carrier()),
+        (Value::string("qos"), vm::option::none_carrier()),
+        (Value::string("retain"), vm::option::none_carrier()),
+        (Value::string("dup"), vm::option::none_carrier()),
+        (
+            Value::string("reason"),
+            vm::option::some_carrier(Value::string(reason)),
+        ),
+    ])
 }
 
 #[derive(Clone, Debug)]
@@ -391,5 +417,103 @@ impl MqttConnectionState {
     pub(crate) fn note_ping_response_received(&mut self) {
         self.last_activity_at = Some(Instant::now());
         self.ping_response_pending = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn field<'a>(value: &'a Value, name: &str) -> &'a Value {
+        let Value::Map(entries) = value else {
+            panic!("MqttEvent must be a map, got {value:?}");
+        };
+        entries
+            .get(&Value::string(name))
+            .unwrap_or_else(|| panic!("MqttEvent must always carry '{name}'"))
+    }
+
+    fn optional_text(value: &Value) -> Option<String> {
+        let (some, payload) = vm::option::payload(value)
+            .unwrap_or_else(|error| panic!("'{value:?}' must be a canonical Option: {error}"));
+        if !some {
+            return None;
+        }
+        match payload {
+            Some(Value::String(text)) => Some(text.to_string()),
+            other => panic!("Option::Some payload must be text, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn publish_event_carries_publish_members_and_no_reason() {
+        let value = MqttEvent::Publish {
+            topic: "pd-edge/topic".to_string(),
+            payload: b"hello".to_vec(),
+            qos: 1,
+            retain: true,
+            dup: false,
+        }
+        .into_value();
+
+        assert_eq!(
+            field(&value, "kind"),
+            &Value::string("publish"),
+            "the discriminator is always present"
+        );
+        assert_eq!(
+            optional_text(field(&value, "topic")),
+            Some("pd-edge/topic".to_string())
+        );
+        assert_eq!(
+            optional_text(field(&value, "payload_text")),
+            Some("hello".to_string())
+        );
+        assert!(optional_text(field(&value, "payload_base64")).is_some());
+        assert_eq!(
+            field(&value, "qos"),
+            &vm::option::some_carrier(Value::Int(1))
+        );
+        assert_eq!(
+            field(&value, "retain"),
+            &vm::option::some_carrier(Value::Bool(true))
+        );
+        assert_eq!(
+            field(&value, "dup"),
+            &vm::option::some_carrier(Value::Bool(false))
+        );
+        assert_eq!(
+            field(&value, "reason"),
+            &vm::option::none_carrier(),
+            "a publish event carries no reason member"
+        );
+    }
+
+    #[test]
+    fn closed_event_carries_only_its_reason_member() {
+        let value = MqttEvent::Closed {
+            reason: "broker closed".to_string(),
+        }
+        .into_value();
+
+        assert_eq!(field(&value, "kind"), &Value::string("closed"));
+        for absent in [
+            "topic",
+            "payload_text",
+            "payload_base64",
+            "qos",
+            "retain",
+            "dup",
+        ] {
+            assert_eq!(
+                field(&value, absent),
+                &vm::option::none_carrier(),
+                "'{absent}' is absent on a closed event"
+            );
+        }
+        assert_eq!(
+            optional_text(field(&value, "reason")),
+            Some("broker closed".to_string())
+        );
     }
 }

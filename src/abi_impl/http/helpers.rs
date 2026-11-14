@@ -43,6 +43,42 @@ pub(crate) fn optional_text_outcome(value: Result<Option<String>, String>) -> Ca
     CallOutcome::Return(CallReturn::one(optional_text_result(value)))
 }
 
+/// Builds the guest value of a `Result<string, string>` edge reader.
+///
+/// The core `io::read_all` contract reports a recoverable read failure as the
+/// guest error, so the value is the canonical `Result` carrier rather than a
+/// bare string.
+pub(crate) fn text_result(value: Result<String, String>) -> Value {
+    match value {
+        Ok(text) => vm::result::carrier(true, Value::string(text)),
+        Err(message) => vm::result::carrier(false, Value::string(message)),
+    }
+}
+
+/// Wraps [`text_result`] into the single-value host return.
+pub(crate) fn text_result_outcome(value: Result<String, String>) -> CallOutcome {
+    CallOutcome::Return(CallReturn::one(text_result(value)))
+}
+
+/// Builds the guest value of a `Result<int, string>` edge writer.
+///
+/// The core `io::write` contract reports the byte count as the success value,
+/// so the handle-level writer must publish the canonical `Result` carrier.
+pub(crate) fn int_result_outcome(written: i64) -> CallOutcome {
+    CallOutcome::Return(CallReturn::one(vm::result::carrier(
+        true,
+        Value::Int(written),
+    )))
+}
+
+/// Builds the guest value of a `Result<(), string>` edge call.
+///
+/// The core `io::flush` / `io::close` contracts publish a unit success value,
+/// whose physical carrier is the VM's internal Null.
+pub(crate) fn unit_result_outcome() -> CallOutcome {
+    CallOutcome::Return(CallReturn::one(vm::result::carrier(true, Value::Null)))
+}
+
 /// Reads the Boolean `tag` and active `payload` of one canonical carrier map.
 #[cfg(test)]
 fn carrier_fields(value: &Value) -> (bool, Option<Value>) {

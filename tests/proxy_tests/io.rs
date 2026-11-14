@@ -85,8 +85,32 @@ async fn io_protocol_handles_accept_direct_integer_arguments() {
         http::exchange::set_method(upstream, "POST");
         io::write(1, "direct-int-body");
         http::response::set_status(http::exchange::get_status(upstream));
-        http::response::set_header("x-first-line", io::read_line(1));
-        http::response::set_body(io::read_all(1));
+        http::response::set_header("x-first-line", io_line_text(1));
+        http::response::set_body(io_read_all_text(1));
+
+        // `io::read_all` reports a read failure as the guest error, so the test
+        // collapses it to "" exactly as the previous bare string did.
+        fn io_read_all_text(handle: int) -> string {{
+            let value: Result<string, string> = io::read_all(handle);
+            match value {{
+                Result::Ok(text) => text,
+                Result::Err(error) => "",
+            }}
+        }}
+
+        // `io::read_line` is the core fallible optional-text contract: EOF is
+        // `Option::None`, a blank line is `Some("")`, and a failure is the
+        // guest error. This test needs the header text, so both keep "".
+        fn io_line_text(handle: int) -> string {{
+            let value: Result<Option<string>, string> = io::read_line(handle);
+            match value {{
+                Result::Ok(present) => match present {{
+                    Option::Some(text) => text,
+                    Option::None => "",
+                }},
+                Result::Err(error) => "",
+            }}
+        }}
     "#,
         upstream_host = upstream_addr.ip(),
         upstream_port = upstream_addr.port()
@@ -140,8 +164,29 @@ async fn io_protocol_handles_accept_tls_session_handles_for_https_exchange() {
 
         io::write(session, "tls-direct-body");
         http::response::set_status(http::exchange::get_status(upstream));
-        http::response::set_header("x-first-line", io::read_line(session));
-        http::response::set_body(io::read_all(session));
+        http::response::set_header("x-first-line", io_line_text(session));
+        http::response::set_body(io_read_all_text(session));
+
+        // `io::read_all` reports a read failure as the guest error.
+        fn io_read_all_text(handle: int) -> string {{
+            let value: Result<string, string> = io::read_all(handle);
+            match value {{
+                Result::Ok(text) => text,
+                Result::Err(error) => "",
+            }}
+        }}
+
+        // `io::read_line` is the core fallible optional-text contract.
+        fn io_line_text(handle: int) -> string {{
+            let value: Result<Option<string>, string> = io::read_line(handle);
+            match value {{
+                Result::Ok(present) => match present {{
+                    Option::Some(text) => text,
+                    Option::None => "",
+                }},
+                Result::Err(error) => "",
+            }}
+        }}
     "#,
         upstream_addr.port()
     );
@@ -193,8 +238,29 @@ async fn direct_vm_io_protocol_handles_accept_direct_integer_arguments() {
         http::exchange::set_path(upstream, "/literal");
         http::exchange::set_method(upstream, "POST");
         io::write(1, "direct-int-body");
-        http::response::set_header("x-first-line", io::read_line(1));
-        http::response::set_body(io::read_all(1));
+        http::response::set_header("x-first-line", io_line_text(1));
+        http::response::set_body(io_read_all_text(1));
+
+        // `io::read_all` reports a read failure as the guest error.
+        fn io_read_all_text(handle: int) -> string {{
+            let value: Result<string, string> = io::read_all(handle);
+            match value {{
+                Result::Ok(text) => text,
+                Result::Err(error) => "",
+            }}
+        }}
+
+        // `io::read_line` is the core fallible optional-text contract.
+        fn io_line_text(handle: int) -> string {{
+            let value: Result<Option<string>, string> = io::read_line(handle);
+            match value {{
+                Result::Ok(present) => match present {{
+                    Option::Some(text) => text,
+                    Option::None => "",
+                }},
+                Result::Err(error) => "",
+            }}
+        }}
     "#,
         upstream_host = upstream_addr.ip(),
         upstream_port = upstream_addr.port()

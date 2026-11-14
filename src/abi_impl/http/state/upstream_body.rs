@@ -313,7 +313,7 @@ impl UpstreamResponseBodyState {
             .await
     }
 
-    pub(super) async fn read_next_line(&mut self) -> Result<Vec<u8>, VmError> {
+    pub(super) async fn read_next_line(&mut self) -> Result<Option<Vec<u8>>, VmError> {
         self.stream.read_next_line(&mut self.source).await
     }
 

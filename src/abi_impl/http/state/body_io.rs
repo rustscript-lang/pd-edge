@@ -63,10 +63,15 @@ impl BufferedByteStream {
         Ok(chunk)
     }
 
+    /// Reads the next `\n`-delimited line, excluding the delimiter.
+    ///
+    /// `Ok(None)` is end of stream. `Ok(Some(line))` is a present line, which
+    /// may be empty when the stream carries a blank line; the delimiter itself
+    /// is never part of the returned bytes.
     pub(super) async fn read_next_line<S: BufferedByteSource>(
         &mut self,
         source: &mut S,
-    ) -> Result<Vec<u8>, VmError> {
+    ) -> Result<Option<Vec<u8>>, VmError> {
         loop {
             let start = self.read_offset.min(self.buffered.len());
             if start < self.buffered.len() {
@@ -77,15 +82,15 @@ impl BufferedByteStream {
                     let end = start + rel_end;
                     let line = self.buffered[start..end].to_vec();
                     self.read_offset = end.saturating_add(1);
-                    return Ok(line);
+                    return Ok(Some(line));
                 }
                 if self.eof {
                     let line = self.buffered[start..].to_vec();
                     self.read_offset = self.buffered.len();
-                    return Ok(line);
+                    return Ok(Some(line));
                 }
             } else if self.eof {
-                return Ok(Vec::new());
+                return Ok(None);
             }
 
             self.apply_pull(source.pull_next().await?);
@@ -190,7 +195,7 @@ impl InboundRequestBodyState {
             .await
     }
 
-    pub(super) async fn read_next_line(&mut self) -> Result<Vec<u8>, VmError> {
+    pub(super) async fn read_next_line(&mut self) -> Result<Option<Vec<u8>>, VmError> {
         self.stream.read_next_line(&mut self.source).await
     }
 
@@ -274,6 +279,31 @@ fn finalize_downstream_body_eof_result(
     }
 }
 
+/// Finalizes one downstream line read.
+///
+/// `Ok(None)` is end of stream and closes the downstream transport; a present
+/// line does not, because an empty line is a real line rather than EOF.
+fn finalize_downstream_body_line_result(
+    context: &SharedProxyVmContext,
+    inbound: &InboundRequestBodyState,
+    result: Result<Option<Vec<u8>>, VmError>,
+) -> Result<Option<Vec<u8>>, VmError> {
+    context.note_downstream_request_body_read();
+    match result {
+        Ok(line) => {
+            if line.is_none() || inbound.is_drained() {
+                mark_downstream_transport_closed(context);
+            }
+            Ok(line)
+        }
+        Err(err) => {
+            let message = err.to_string();
+            mark_downstream_transport_failed(context, &message);
+            Err(err)
+        }
+    }
+}
+
 pub(crate) async fn read_request_body_all(
     context: &SharedProxyVmContext,
 ) -> Result<Vec<u8>, VmError> {
@@ -299,13 +329,80 @@ pub(crate) async fn read_request_body_next_chunk(
 
 pub(crate) async fn read_request_body_next_line(
     context: &SharedProxyVmContext,
-) -> Result<Vec<u8>, VmError> {
+) -> Result<Option<Vec<u8>>, VmError> {
     let mut inbound = context.inbound_request_body.lock().await;
     let result = inbound.read_next_line().await;
-    finalize_downstream_body_read_result(context, &inbound, result)
+    finalize_downstream_body_line_result(context, &inbound, result)
 }
 
 pub(crate) async fn request_body_eof(context: &SharedProxyVmContext) -> Result<bool, VmError> {
     let mut inbound = context.inbound_request_body.lock().await;
     finalize_downstream_body_eof_result(context, inbound.eof().await)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A source that yields one fixed chunk and then reports end of stream.
+    struct OneChunkSource {
+        chunk: Option<Bytes>,
+    }
+
+    impl BufferedByteSource for OneChunkSource {
+        fn pull_next<'a>(&'a mut self) -> BufferedByteSourceFuture<'a> {
+            Box::pin(async move {
+                Ok(match self.chunk.take() {
+                    Some(chunk) => BufferedByteStreamPull::Chunk(chunk),
+                    None => BufferedByteStreamPull::Eof,
+                })
+            })
+        }
+    }
+
+    async fn read_lines(payload: &'static str) -> Vec<Option<String>> {
+        let mut stream = BufferedByteStream::default();
+        let mut source = OneChunkSource {
+            chunk: Some(Bytes::from_static(payload.as_bytes())),
+        };
+        let mut lines = Vec::new();
+        loop {
+            let line = stream
+                .read_next_line(&mut source)
+                .await
+                .expect("line read should succeed");
+            let done = line.is_none();
+            lines.push(line.map(|bytes| String::from_utf8_lossy(&bytes).into_owned()));
+            if done {
+                return lines;
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_next_line_distinguishes_blank_lines_from_end_of_stream() {
+        let lines = read_lines("alpha\n\nbeta").await;
+        assert_eq!(
+            lines,
+            vec![
+                Some("alpha".to_string()),
+                Some(String::new()),
+                Some("beta".to_string()),
+                None
+            ],
+            "a blank line is a present empty line and end of stream is None"
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_next_line_strips_one_trailing_delimiter() {
+        let lines = read_lines("alpha\n").await;
+        assert_eq!(lines, vec![Some("alpha".to_string()), None]);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn read_next_line_reports_only_end_of_stream_for_an_empty_body() {
+        let lines = read_lines("").await;
+        assert_eq!(lines, vec![None]);
+    }
 }
