@@ -16,7 +16,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 /// The frozen core candidate this workspace migrates against.
-const FROZEN_CORE_REV: &str = "b1d6cffede77f49410bf63525f30b9a46b02dc01";
+const FROZEN_CORE_REV: &str = "fc8b0c8179640a8ffe460a64b3690e35c2f7eb73";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
 
 fn manifest_dir() -> PathBuf {
@@ -308,7 +308,7 @@ fn pd_vm_enabled_features(metadata: &CargoMetadata) -> BTreeSet<String> {
         .collect()
 }
 
-fn in_tree_abi25_present(metadata: &CargoMetadata) -> bool {
+fn in_tree_abi26_present(metadata: &CargoMetadata) -> bool {
     metadata.packages.iter().any(|package| {
         package.name == "pd-edge-abi"
             && package.version == "0.1.0"
@@ -353,7 +353,7 @@ fn pd_edge_features_never_enable_vm_edge_abi() {
         .expect("the http feature must remain declared");
     assert!(
         http.iter().any(|item| item == "edge_abi/http"),
-        "http must keep enabling the in-tree ABI25 http surface: {http:?}"
+        "http must keep enabling the in-tree ABI26 http surface: {http:?}"
     );
     assert!(
         !http.iter().any(|item| enables_vm_edge_abi(item)),
@@ -362,7 +362,7 @@ fn pd_edge_features_never_enable_vm_edge_abi() {
 }
 
 #[test]
-fn feature_matrix_metadata_keeps_git_abi25_and_drops_registry_family() {
+fn feature_matrix_metadata_keeps_git_abi26_and_drops_registry_family() {
     for (label, extra) in feature_matrices() {
         let metadata = cargo_metadata(extra);
         let offenders = family_registry_offenders(&metadata);
@@ -380,8 +380,8 @@ fn feature_matrix_metadata_keeps_git_abi25_and_drops_registry_family() {
             "{label} cargo metadata enabled pd-vm edge-abi: {features:?}"
         );
         assert!(
-            in_tree_abi25_present(&metadata),
-            "{label} cargo metadata must keep the in-tree ABI25 pd-edge-abi crate"
+            in_tree_abi26_present(&metadata),
+            "{label} cargo metadata must keep the in-tree ABI26 pd-edge-abi crate"
         );
     }
 }

@@ -13,7 +13,7 @@ http::exchange::set_path(upstream, upstream_path);
 let status = http::exchange::get_status(upstream);
 http::response::set_status(status);
 
-let content_type = http::exchange::get_header(upstream, "content-type");
+let content_type = exchange_header_text(upstream, "content-type");
 if content_type != "" {
     http::response::set_header("content-type", content_type);
 }
@@ -40,3 +40,17 @@ if event != "" {
 }
 
 http::response::stream::finish();
+
+// `http::exchange::get_header` reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn exchange_header_text(exchange: int, name: string) -> string {
+    let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}

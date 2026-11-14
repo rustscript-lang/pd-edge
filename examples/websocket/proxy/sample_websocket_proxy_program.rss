@@ -17,12 +17,12 @@ if websocket::connection::is_present(downstream) {
 }
 let upstream_host = "127.0.0.1";
 let upstream_port = 18091;
-let text_payload = http::request::get_header("x-ws-message");
-let binary_payload_hex = http::request::get_header("x-ws-binary-hex");
-let requested_handle = http::request::get_header("x-ws-handle");
-let mut requested_subprotocols = http::request::get_header("x-ws-subprotocols");
-let custom_header_name = http::request::get_header("x-ws-header-name");
-let custom_header_value = http::request::get_header("x-ws-header-value");
+let text_payload = request_header_text("x-ws-message");
+let binary_payload_hex = request_header_text("x-ws-binary-hex");
+let requested_handle = request_header_text("x-ws-handle");
+let mut requested_subprotocols = request_header_text("x-ws-subprotocols");
+let custom_header_name = request_header_text("x-ws-header-name");
+let custom_header_value = request_header_text("x-ws-header-value");
 
 let mut connection = websocket::connection::new();
 let mut handle_label = "new";
@@ -97,4 +97,18 @@ if websocket::connection::eof(connection) {
     http::response::set_header("x-ws-eof-after-close", "true");
 } else {
     http::response::set_header("x-ws-eof-after-close", "false");
+}
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
 }

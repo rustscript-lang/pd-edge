@@ -121,7 +121,7 @@ fn parse_edge_host_attr(args: &Punctuated<Meta, Token![,]>) -> Result<EdgeHostAt
             Meta::List(list) if list.path.is_ident("bind") => {
                 let idents =
                     list.parse_args_with(Punctuated::<Ident, Token![,]>::parse_terminated)?;
-                bind_params.extend(idents.into_iter());
+                bind_params.extend(idents);
             }
             other => {
                 return Err(Error::new_spanned(

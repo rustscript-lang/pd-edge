@@ -1283,6 +1283,9 @@ fn data_plane_vm_execution_error_response(
     }
 }
 
+// The HTTP response error variant is the caller-visible value; boxing it would
+// change every call site for a lint that this boundary cannot satisfy.
+#[allow(clippy::result_large_err)]
 pub(super) async fn run_prepared_data_plane_http_request_context(
     state: SharedState,
     program: Arc<LoadedProgram>,

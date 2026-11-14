@@ -141,11 +141,11 @@ fn every_supported_flavor_example_compiles() {
     let flavors = [
         (
             "examples/http/proxy/sample_proxy_program.js",
-            SourceFlavor::JavaScript,
+            SourceFlavor::Plugin(vm::FrontendId::new("javascript")),
         ),
         (
             "examples/http/proxy/sample_proxy_program.lua",
-            SourceFlavor::Lua,
+            SourceFlavor::Plugin(vm::FrontendId::new("lua")),
         ),
     ];
     let mut skipped = Vec::new();

@@ -51,12 +51,12 @@ fn parse_decimal_or(value, fallback) {
     if valid => { parsed } else => { fallback }
 }
 
-let mut host = http::request::get_header("x-mqtt-host");
+let mut host = request_header_text("x-mqtt-host");
 if host == "" {
     host = "127.0.0.1";
 }
 
-let mut scheme = http::request::get_header("x-mqtt-scheme");
+let mut scheme = request_header_text("x-mqtt-scheme");
 if scheme == "" {
     scheme = "mqtt";
 }
@@ -65,36 +65,36 @@ let mut port = if scheme == "mqtts" => {
 } else => {
     1883
 };
-port = parse_decimal_or(http::request::get_header("x-mqtt-port"), port);
+port = parse_decimal_or(request_header_text("x-mqtt-port"), port);
 
-let requested_handle = http::request::get_header("x-mqtt-handle");
-let mut topic = http::request::get_header("x-mqtt-topic");
+let requested_handle = request_header_text("x-mqtt-handle");
+let mut topic = request_header_text("x-mqtt-topic");
 if topic == "" {
     topic = "pd-edge/sample";
 }
 
 let request_body = http::request::get_body();
-let header_payload = http::request::get_header("x-mqtt-payload");
-let header_payload_hex = http::request::get_header("x-mqtt-payload-hex");
+let header_payload = request_header_text("x-mqtt-payload");
+let header_payload_hex = request_header_text("x-mqtt-payload-hex");
 let payload = if request_body != "" => {
     request_body
 } else => {
     header_payload
 };
 
-let subscribe_filter = http::request::get_header("x-mqtt-subscribe");
-let qos_header = http::request::get_header("x-mqtt-qos");
+let subscribe_filter = request_header_text("x-mqtt-subscribe");
+let qos_header = request_header_text("x-mqtt-qos");
 let qos = if qos_header == "1" => {
     1
 } else => {
     0
 };
 
-let retain_header = http::request::get_header("x-mqtt-retain");
+let retain_header = request_header_text("x-mqtt-retain");
 let retain = retain_header == "true" || retain_header == "1" || retain_header == "on";
-let client_id = http::request::get_header("x-mqtt-client-id");
-let username = http::request::get_header("x-mqtt-username");
-let password = http::request::get_header("x-mqtt-password");
+let client_id = request_header_text("x-mqtt-client-id");
+let username = request_header_text("x-mqtt-username");
+let password = request_header_text("x-mqtt-password");
 
 let mut connection = mqtt::connection::new();
 let mut handle_label = "new";
@@ -181,3 +181,17 @@ if subscribe_filter != "" {
 
 mqtt::connection::disconnect(connection, 0, "sample-complete");
 http::response::set_header("x-mqtt-phase-after-disconnect", mqtt::connection::get_phase(connection));
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}

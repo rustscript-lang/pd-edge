@@ -28,7 +28,7 @@ name = "edge"
 # Keep HTTP/3 opt-in in normal builds; release.yml enables it explicitly with --all-features.
 # Do not enable `vm/edge-abi`: frozen pd-vm's optional edge-abi depends on
 # crates.io pd-edge-abi 0.1.1 (ABI24). HTTP compiles and runs against the
-# in-tree ABI25 catalog, exact compiler overlay, and runtime descriptors.
+# in-tree ABI26 catalog, exact compiler overlay, and runtime descriptors.
 default = ["console", "http", "tls", "websocket"]
 console = ["http", "tls", "websocket", "edge_abi/console"]
 native-jit = ["vm/cranelift-jit"]
@@ -73,7 +73,7 @@ h3-quinn = { version = "0.0.10", optional = true }
 futures-util = "0.3"
 pd-edge-host-function = { path = "./pd-edge-host-function", version = "0.1.0" }
 linkme = "0.3"
-vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", version = "0.1.0", default-features = false, features = ["runtime"] }
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "fc8b0c8179640a8ffe460a64b3690e35c2f7eb73", version = "0.1.0", default-features = false, features = ["runtime"] }
 edge_abi = { package = "pd-edge-abi", path = "./pd-edge-abi", version = "0.1.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

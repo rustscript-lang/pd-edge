@@ -22,7 +22,7 @@ fn with_edge_stdlib_overrides(mut options: CompileSourceFileOptions) -> CompileS
     options
 }
 
-/// Compile options used by [`compile_edge_source_file`]: the in-tree ABI25
+/// Compile options used by [`compile_edge_source_file`]: the in-tree ABI26
 /// catalog plus the embedded edge stdlib overlays.
 pub fn edge_compile_options() -> CompileSourceFileOptions {
     with_edge_stdlib_overrides(CompileSourceFileOptions::new())

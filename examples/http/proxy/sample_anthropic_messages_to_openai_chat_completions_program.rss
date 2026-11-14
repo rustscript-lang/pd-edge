@@ -256,14 +256,14 @@ fn process_stream_event(event_data: string, state: StreamState) -> StreamState {
 let downstream_body = http::request::get_body();
 let upstream = http::exchange::default_upstream();
 
-let requested_upstream_host = http::request::get_header("x-anthropic-host");
+let requested_upstream_host = request_header_text("x-anthropic-host");
 let upstream_host = if requested_upstream_host == "" => {
     "127.0.0.1"
 } else => {
     requested_upstream_host
 };
 
-let upstream_port_text = http::request::get_header("x-anthropic-port");
+let upstream_port_text = request_header_text("x-anthropic-port");
 let mut upstream_port = 18092;
 if upstream_port_text != "" {
     let mut parsed_port = 0;
@@ -297,14 +297,14 @@ if upstream_port_text != "" {
     }
 }
 
-let requested_upstream_scheme = http::request::get_header("x-anthropic-scheme");
+let requested_upstream_scheme = request_header_text("x-anthropic-scheme");
 let upstream_scheme = if requested_upstream_scheme == "" => {
     "http"
 } else => {
     requested_upstream_scheme
 };
 
-let requested_upstream_path = http::request::get_header("x-anthropic-path");
+let requested_upstream_path = request_header_text("x-anthropic-path");
 let upstream_path = if requested_upstream_path == "" => {
     "/v1/messages"
 } else => {
@@ -316,29 +316,29 @@ http::exchange::set_target(upstream, upstream_host, upstream_port);
 http::exchange::set_scheme(upstream, upstream_scheme);
 http::exchange::set_path(upstream, upstream_path);
 
-let api_key = http::request::get_header("x-api-key");
+let api_key = request_header_text("x-api-key");
 if api_key != "" {
     http::exchange::set_header(upstream, "x-api-key", api_key);
 }
 
-let anthropic_beta = http::request::get_header("anthropic-beta");
+let anthropic_beta = request_header_text("anthropic-beta");
 if anthropic_beta != "" {
     http::exchange::set_header(upstream, "anthropic-beta", anthropic_beta);
 }
 
-let authorization = http::request::get_header("authorization");
+let authorization = request_header_text("authorization");
 if authorization != "" {
     http::exchange::set_header(upstream, "authorization", authorization);
 }
 
-let anthropic_version = http::request::get_header("anthropic-version");
+let anthropic_version = request_header_text("anthropic-version");
 if anthropic_version == "" {
     http::exchange::set_header(upstream, "anthropic-version", "2023-06-01");
 } else {
     http::exchange::set_header(upstream, "anthropic-version", anthropic_version);
 }
 
-let downstream_content_type = http::request::get_header("content-type");
+let downstream_content_type = request_header_text("content-type");
 if downstream_content_type == "" {
     http::exchange::set_header(upstream, "content-type", "application/json");
 } else {
@@ -348,7 +348,7 @@ if downstream_content_type == "" {
 http::exchange::set_body(upstream, downstream_body);
 
 let upstream_status = http::exchange::get_status(upstream);
-let upstream_content_type = http::exchange::get_header(upstream, "content-type");
+let upstream_content_type = exchange_header_text(upstream, "content-type");
 
 http::response::set_status(upstream_status);
 http::response::set_header("x-compat-upstream", "anthropic-messages");
@@ -469,4 +469,32 @@ if upstream_status != 200 {
 
     http::response::set_header("content-type", "application/json");
     http::response::set_body(json::encode(openai_response));
+}
+
+// `http::request::get_header` now reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn request_header_text(name: string) -> string {
+    let value: Result<Option<string>, string> = http::request::get_header(name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
+}
+
+// `http::exchange::get_header` reports an absent header or an undecodable
+// value instead of returning an empty string. This sample only needs the value,
+// so absence and a malformed value keep the previous empty-string default.
+fn exchange_header_text(exchange: int, name: string) -> string {
+    let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
+    match value {
+        Result::Ok(present) => match present {
+            Option::Some(text) => text,
+            Option::None => "",
+        },
+        Result::Err(error) => "",
+    }
 }

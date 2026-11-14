@@ -2,8 +2,8 @@
 use super::state::attach_outbound_exchange_tls_transport;
 use super::{
     helpers::{
-        headers_to_value_map, is_valid_request_path, parse_header, parse_header_name,
-        parse_string_header_batch, serialize_query_pairs,
+        headers_to_value_map, is_valid_request_path, optional_header_text, optional_text_result,
+        parse_header, parse_header_name, parse_string_header_batch, serialize_query_pairs,
     },
     state::{
         HttpUpstreamScheme, SharedProxyVmContext, allocate_outbound_exchange_handle,
@@ -516,6 +516,10 @@ fn get_exchange_status(
 }
 
 /// Returns the first value for a header on the outbound HTTP exchange.
+///
+/// `Ok(None)` means the exchange carries no such header, `Ok(Some(""))` means
+/// it carries it with an empty value, and `Err` reports a value that is not
+/// valid text. An invalid header name is a fatal host error.
 #[pd_edge_host_function(name = http_exchange::GET_HEADER.name, scope = http)]
 fn get_exchange_header(
     vm: &mut Vm,
@@ -526,12 +530,9 @@ fn get_exchange_header(
     let header_name = axum::http::HeaderName::from_bytes(name.as_bytes())
         .map_err(|_| VmError::HostError(format!("invalid header name '{name}'")))?;
     exchange_response_values_outcome(vm, context, exchange, move |snapshot| {
-        let value = snapshot
-            .headers
-            .get(&header_name)
-            .and_then(|value| value.to_str().ok())
-            .unwrap_or("");
-        Ok(vm::CallReturn::one(Value::string(value)))
+        Ok(vm::CallReturn::one(optional_text_result(
+            optional_header_text(snapshot.headers.get(&header_name)),
+        )))
     })
 }
 
