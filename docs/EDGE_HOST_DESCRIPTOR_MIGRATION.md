@@ -67,7 +67,7 @@ fingerprint tag, so it is an explicit ABI-versioned change.
 
 Compile options install this catalog so the guest compiler sees the named
 contract. The coarse `pd-edge-abi` wire type for `read_event` remains `map`.
-A member the active variant does not carry is an explicit `Option::None`
+A member the active variant does not carry is an explicit `None`
 carrier, never a missing map entry and never a nullable (`optional<T>`) field:
 the frozen compiler rejects a nullable field on a host output and requires the
 canonical `Option` carrier for an absent member.
