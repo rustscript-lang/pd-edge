@@ -1802,7 +1802,7 @@ dependencies = [
  "parking_lot",
  "pd-edge-abi",
  "pd-edge-host-function",
- "pd-vm 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73)",
+ "pd-vm",
  "quinn",
  "rand 0.8.5",
  "rcgen 0.12.1",
@@ -1830,8 +1830,8 @@ dependencies = [
 name = "pd-edge-abi"
 version = "0.1.0"
 dependencies = [
- "pd-host-function 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e)",
- "pd-vm 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e)",
+ "pd-host-function",
+ "pd-vm",
  "syn",
 ]
 
@@ -1849,18 +1849,7 @@ name = "pd-host-function"
 version = "0.1.0"
 source = "git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e#8db4583298cce9806d617322606537e6344c8b6e"
 dependencies = [
- "pd-host-schema 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e)",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "pd-host-function"
-version = "0.1.0"
-source = "git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73#fc8b0c8179640a8ffe460a64b3690e35c2f7eb73"
-dependencies = [
- "pd-host-schema 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73)",
+ "pd-host-schema",
  "proc-macro2",
  "quote",
  "syn",
@@ -1876,38 +1865,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "pd-host-schema"
-version = "0.1.0"
-source = "git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73#fc8b0c8179640a8ffe460a64b3690e35c2f7eb73"
-dependencies = [
- "proc-macro2",
- "syn",
-]
-
-[[package]]
 name = "pd-vm"
 version = "0.1.0"
 source = "git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e#8db4583298cce9806d617322606537e6344c8b6e"
-dependencies = [
- "base64",
- "futures-channel",
- "libc",
- "paste",
- "pd-host-function 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e)",
- "pd-host-schema 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=8db4583298cce9806d617322606537e6344c8b6e)",
- "regex",
- "rt-format",
- "self_cell",
- "serde",
- "serde_json",
- "syn",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "pd-vm"
-version = "0.1.0"
-source = "git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73#fc8b0c8179640a8ffe460a64b3690e35c2f7eb73"
 dependencies = [
  "base64",
  "cranelift-codegen",
@@ -1918,8 +1878,8 @@ dependencies = [
  "futures-channel",
  "libc",
  "paste",
- "pd-host-function 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73)",
- "pd-host-schema 0.1.0 (git+https://github.com/rustscript-lang/rustscript.git?rev=fc8b0c8179640a8ffe460a64b3690e35c2f7eb73)",
+ "pd-host-function",
+ "pd-host-schema",
  "regex",
  "rt-format",
  "self_cell",

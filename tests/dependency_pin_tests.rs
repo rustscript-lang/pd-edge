@@ -16,7 +16,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 /// The frozen core candidate this workspace migrates against.
-const FROZEN_CORE_REV: &str = "fc8b0c8179640a8ffe460a64b3690e35c2f7eb73";
+const FROZEN_CORE_REV: &str = "8db4583298cce9806d617322606537e6344c8b6e";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
 
 fn manifest_dir() -> PathBuf {
@@ -292,22 +292,14 @@ fn family_registry_offenders(metadata: &CargoMetadata) -> Vec<String> {
 
 /// Features the workspace runtime build resolves for its own `pd-vm` pin.
 ///
-/// The workspace now carries two core pins: the runtime (`fc8b0c81...`) and the
-/// descriptor core the in-tree ABI is built against. This looks the runtime pin
-/// up by source so the compiler-only ABI pin can never be mistaken for it.
+/// The pin tests above require every core git dependency to carry the frozen
+/// revision, so exactly one `pd-vm` copy can appear in the resolved graph.
 fn pd_vm_enabled_features(metadata: &CargoMetadata) -> BTreeSet<String> {
-    let runtime_pin = format!("rev={FROZEN_CORE_REV}");
     let package = metadata
         .packages
         .iter()
-        .find(|package| {
-            package.name == "pd-vm"
-                && package
-                    .source
-                    .as_deref()
-                    .is_some_and(|source| source.contains(&runtime_pin))
-        })
-        .unwrap_or_else(|| panic!("cargo metadata must include the workspace runtime pd-vm pin"));
+        .find(|package| package.name == "pd-vm")
+        .unwrap_or_else(|| panic!("cargo metadata must include the pd-vm package"));
     metadata
         .resolve
         .nodes
