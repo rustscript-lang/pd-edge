@@ -584,8 +584,8 @@ async fn tiny_language_can_enforce_simple_rate_limit() {
 
         let client_id = match http::request::get_header("x-client-id") {
             Result::Ok(present) => match present {
-                Option::Some(text) => text,
-                Option::None => "",
+                Some(text) => text,
+                None => "",
              },
             Result::Err(error) => "",
         };
@@ -682,8 +682,8 @@ async fn http_prefixed_host_abi_can_rewrite_request_and_short_circuit() {
 
         let client_id = match http::request::get_header("x-client-id") {{
             Result::Ok(present) => match present {{
-                Option::Some(text) => text,
-                Option::None => "",
+                Some(text) => text,
+                None => "",
              }},
             Result::Err(error) => "",
         }};
@@ -2616,14 +2616,14 @@ async fn direct_vm_can_read_upstream_response_line_by_line_via_io_handle_api() {
         }}
 
         // `io::read_line` is the core fallible optional-text contract: EOF is
-        // `Option::None`, a blank line is `Some("")`, and a failure is the
+        // `None`, a blank line is `Some("")`, and a failure is the
         // guest error. The loop tests `eof`, so both keep "" here.
         fn io_line_text(handle: int) -> string {{
             let value: Result<Option<string>, string> = io::read_line(handle);
             match value {{
                 Result::Ok(present) => match present {{
-                    Option::Some(text) => text,
-                    Option::None => "",
+                    Some(text) => text,
+                    None => "",
                 }},
                 Result::Err(error) => "",
             }}
@@ -4654,22 +4654,22 @@ async fn exchange_get_header_reports_present_and_absent_members() {
 
         let present = match http::exchange::get_header(upstream, "x-present") {{
             Result::Ok(member) => match member {{
-                Option::Some(text) => "some:" + text,
-                Option::None => "none",
+                Some(text) => "some:" + text,
+                None => "none",
             }},
             Result::Err(error) => "error:" + error,
         }};
         let empty = match http::exchange::get_header(upstream, "x-empty") {{
             Result::Ok(member) => match member {{
-                Option::Some(text) => "some:" + text,
-                Option::None => "none",
+                Some(text) => "some:" + text,
+                None => "none",
             }},
             Result::Err(error) => "error:" + error,
         }};
         let absent = match http::exchange::get_header(upstream, "x-absent") {{
             Result::Ok(member) => match member {{
-                Option::Some(text) => "some:" + text,
-                Option::None => "none",
+                Some(text) => "some:" + text,
+                None => "none",
             }},
             Result::Err(error) => "error:" + error,
         }};
@@ -4793,15 +4793,15 @@ async fn response_get_trailer_reports_a_present_upstream_trailer() {
 
         let checksum = match http::response::get_trailer("x-checksum") {{
             Result::Ok(member) => match member {{
-                Option::Some(text) => text,
-                Option::None => "none",
+                Some(text) => text,
+                None => "none",
             }},
             Result::Err(error) => "error:" + error,
         }};
         let absent_trailer = match http::response::get_trailer("x-not-sent") {{
             Result::Ok(member) => match member {{
-                Option::Some(text) => text,
-                Option::None => "none",
+                Some(text) => text,
+                None => "none",
             }},
             Result::Err(error) => "error:" + error,
         }};

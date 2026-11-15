@@ -185,8 +185,8 @@ fn request_header_text(name: string) -> string {
     let value: Result<Option<string>, string> = http::request::get_header(name);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }
@@ -195,15 +195,15 @@ fn request_header_text(name: string) -> string {
 // Whether the `MqttEvent` member belongs to the active event variant.
 fn option_present(value: Option<string>) -> bool {
     match value {
-        Option::Some(text) => true,
-        Option::None => false,
+        Some(text) => true,
+        None => false,
     }
 }
 
 // The member text of an active variant; an absent member renders as "".
 fn option_text(value: Option<string>) -> string {
     match value {
-        Option::Some(text) => text,
-        Option::None => "",
+        Some(text) => text,
+        None => "",
     }
 }

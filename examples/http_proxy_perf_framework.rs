@@ -137,15 +137,15 @@ let method = http::request::get_method();
 let path = http::request::get_path();
 let client_id = match http::request::get_header("x-client-id") {{
     Result::Ok(present) => match present {{
-        Option::Some(text) => text,
-        Option::None => "",
+        Some(text) => text,
+        None => "",
      }},
     Result::Err(error) => "",
 }};
 let request_body_mode = match http::request::get_header("x-bench-body-mode") {{
     Result::Ok(present) => match present {{
-        Option::Some(text) => text,
-        Option::None => "",
+        Some(text) => text,
+        None => "",
      }},
     Result::Err(error) => "",
 }};
