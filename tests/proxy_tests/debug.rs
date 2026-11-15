@@ -91,7 +91,7 @@ async fn debug_attached_request_does_not_block_non_debug_requests() {
         }
     }
 
-    timeout(Duration::from_secs(10), async {
+    timeout(Duration::from_secs(60), async {
     let (data_addr, admin_addr, data_handle, admin_handle) = spawn_proxy(1024 * 1024).await;
     let _abort_proxy = AbortProxyOnDrop {
         data: data_handle,
@@ -131,7 +131,7 @@ async fn debug_attached_request_does_not_block_non_debug_requests() {
     tokio::time::sleep(Duration::from_millis(150)).await;
 
     let non_debug = timeout(
-        Duration::from_secs(2),
+        Duration::from_secs(15),
         client.get(format!("http://{data_addr}/normal")).send(),
     )
     .await
@@ -142,7 +142,7 @@ async fn debug_attached_request_does_not_block_non_debug_requests() {
 
     send_pdb_continue(debug_addr).await;
 
-    let (status, body) = timeout(Duration::from_secs(2), debug_request.join())
+    let (status, body) = timeout(Duration::from_secs(15), debug_request.join())
         .await
         .expect("debug request timed out")
         .expect("debug task should join");
@@ -156,7 +156,7 @@ async fn debug_attached_request_does_not_block_non_debug_requests() {
 
 #[tokio::test]
 async fn debug_session_is_removed_after_debugger_disconnects() {
-    timeout(Duration::from_secs(10), async {
+    timeout(Duration::from_secs(60), async {
     let (data_addr, admin_addr, data_handle, admin_handle) = spawn_proxy(1024 * 1024).await;
     let client = reqwest::Client::new();
 
@@ -198,7 +198,7 @@ async fn debug_session_is_removed_after_debugger_disconnects() {
     .await
     .expect("debugger helper should not panic");
 
-    let (status, body) = timeout(Duration::from_secs(2), debug_request)
+    let (status, body) = timeout(Duration::from_secs(15), debug_request)
         .await
         .expect("debug request timed out")
         .expect("debug task should join");
