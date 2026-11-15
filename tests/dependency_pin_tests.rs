@@ -290,12 +290,24 @@ fn family_registry_offenders(metadata: &CargoMetadata) -> Vec<String> {
         .collect()
 }
 
+/// Features the workspace runtime build resolves for its own `pd-vm` pin.
+///
+/// The workspace now carries two core pins: the runtime (`fc8b0c81...`) and the
+/// descriptor core the in-tree ABI is built against. This looks the runtime pin
+/// up by source so the compiler-only ABI pin can never be mistaken for it.
 fn pd_vm_enabled_features(metadata: &CargoMetadata) -> BTreeSet<String> {
+    let runtime_pin = format!("rev={FROZEN_CORE_REV}");
     let package = metadata
         .packages
         .iter()
-        .find(|package| package.name == "pd-vm")
-        .unwrap_or_else(|| panic!("cargo metadata must include the pd-vm package"));
+        .find(|package| {
+            package.name == "pd-vm"
+                && package
+                    .source
+                    .as_deref()
+                    .is_some_and(|source| source.contains(&runtime_pin))
+        })
+        .unwrap_or_else(|| panic!("cargo metadata must include the workspace runtime pd-vm pin"));
     metadata
         .resolve
         .nodes
@@ -384,4 +396,116 @@ fn feature_matrix_metadata_keeps_git_abi26_and_drops_registry_family() {
             "{label} cargo metadata must keep the in-tree ABI26 pd-edge-abi crate"
         );
     }
+}
+
+/// Features the native compiler must never see on `pd-vm`; they are the same
+/// ones IronRust's `scripts/check-native-compiler.ps1` rejects.
+const FORBIDDEN_VM_FEATURES: &[&str] = &[
+    "runtime",
+    "async",
+    "http-client",
+    "sqlite",
+    "cli",
+    "cranelift-jit",
+    "edge-abi",
+];
+
+/// Crates whose presence means the compiler-only graph picked up the edge
+/// runtime or its HTTP/TLS stack.
+fn is_runtime_package(name: &str) -> bool {
+    matches!(
+        name,
+        "pd-edge"
+            | "pd-edge-host-function"
+            | "tokio"
+            | "hyper"
+            | "hyper-util"
+            | "axum"
+            | "rustls"
+            | "tokio-rustls"
+            | "rusqlite"
+            | "libsqlite3-sys"
+            | "reqwest"
+            | "mimalloc"
+            | "aws-lc-rs"
+    ) || name.starts_with("cranelift-")
+}
+
+/// The ABI surface is what a compiler-only consumer links. It must stay
+/// runtime-free: let `pd-vm` come in through feature unification and the
+/// compiler-only graph silently gains the whole runtime, which is exactly how
+/// IronRust's `Check compiler-only dependencies` step went red.
+#[test]
+fn compiler_only_surface_never_enables_pd_vm_runtime() {
+    let abi_manifest = manifest_dir().join("pd-edge-abi/Cargo.toml");
+    let manifest = read(&abi_manifest);
+    let line = dependency_line(&manifest, "vm");
+    assert!(
+        line.contains("default-features = false"),
+        "the pd-edge-abi `vm` dependency must stay feature-minimal: {line}"
+    );
+    let requested_features = line
+        .split_once("features = [")
+        .map(|(_, rest)| rest.split(']').next().unwrap_or_default())
+        .unwrap_or_default();
+    assert!(
+        requested_features.trim().is_empty(),
+        "the pd-edge-abi `vm` dependency must not request any pd-vm feature: {line}"
+    );
+
+    let output = Command::new(env!("CARGO"))
+        .arg("tree")
+        .arg("--offline")
+        .arg("--locked")
+        .arg("--manifest-path")
+        .arg(&abi_manifest)
+        .args([
+            "--edges",
+            "normal,build",
+            "--no-default-features",
+            "--features",
+            "console,http,tls,websocket",
+            "--prefix",
+            "none",
+            "--format",
+            "{p} features={f}",
+        ])
+        .current_dir(manifest_dir())
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run cargo tree: {error}"));
+    assert!(
+        output.status.success(),
+        "cargo tree for the compiler-only ABI surface failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let tree = String::from_utf8(output.stdout).expect("cargo tree output must be utf-8");
+    let mut vm_lines = 0;
+    for line in tree.lines() {
+        let Some(name) = line.split_whitespace().next() else {
+            continue;
+        };
+        if name == "pd-vm" {
+            vm_lines += 1;
+            let features = line
+                .split_once("features=")
+                .map(|(_, features)| features.trim_end_matches(" (*)"))
+                .unwrap_or_default();
+            for feature in features.split(',') {
+                assert!(
+                    !FORBIDDEN_VM_FEATURES.contains(&feature),
+                    "the compiler-only ABI surface enables pd-vm/{feature}: {line}"
+                );
+            }
+        } else {
+            assert!(
+                !is_runtime_package(name),
+                "runtime dependency in the compiler-only ABI surface: {line}"
+            );
+        }
+    }
+    assert!(
+        vm_lines > 0,
+        "cargo tree must resolve pd-vm for the compiler-only ABI surface"
+    );
 }
