@@ -99,14 +99,14 @@ async fn io_protocol_handles_accept_direct_integer_arguments() {
         }}
 
         // `io::read_line` is the core fallible optional-text contract: EOF is
-        // `Option::None`, a blank line is `Some("")`, and a failure is the
+        // `None`, a blank line is `Some("")`, and a failure is the
         // guest error. This test needs the header text, so both keep "".
         fn io_line_text(handle: int) -> string {{
             let value: Result<Option<string>, string> = io::read_line(handle);
             match value {{
                 Result::Ok(present) => match present {{
-                    Option::Some(text) => text,
-                    Option::None => "",
+                    Some(text) => text,
+                    None => "",
                 }},
                 Result::Err(error) => "",
             }}
@@ -181,8 +181,8 @@ async fn io_protocol_handles_accept_tls_session_handles_for_https_exchange() {
             let value: Result<Option<string>, string> = io::read_line(handle);
             match value {{
                 Result::Ok(present) => match present {{
-                    Option::Some(text) => text,
-                    Option::None => "",
+                    Some(text) => text,
+                    None => "",
                 }},
                 Result::Err(error) => "",
             }}
@@ -255,8 +255,8 @@ async fn direct_vm_io_protocol_handles_accept_direct_integer_arguments() {
             let value: Result<Option<string>, string> = io::read_line(handle);
             match value {{
                 Result::Ok(present) => match present {{
-                    Option::Some(text) => text,
-                    Option::None => "",
+                    Some(text) => text,
+                    None => "",
                 }},
                 Result::Err(error) => "",
             }}

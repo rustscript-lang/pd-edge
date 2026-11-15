@@ -950,8 +950,8 @@ async fn proxy_pipe_forwards_dynamic_exchange_response_via_proxy_stream_handle()
 
         let content_type = match http::exchange::get_header(exchange, "content-type") {{
             Result::Ok(present) => match present {{
-                Option::Some(text) => text,
-                Option::None => "",
+                Some(text) => text,
+                None => "",
              }},
             Result::Err(error) => "",
         }};

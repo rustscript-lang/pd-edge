@@ -42,15 +42,15 @@ if !websocket::connection::eof(downstream) {
     websocket::connection::close(downstream, 1000, "sse-complete");
 }
 
-// `io::read_line` reports end of stream as `Option::None` and a read failure as
+// `io::read_line` reports end of stream as `None` and a read failure as
 // the guest error instead of returning an empty string. The bridge loop tests
 // `eof`, so an absent line keeps the previous empty-string boundary default.
 fn io_line_text(handle: int) -> string {
     let value: Result<Option<string>, string> = io::read_line(handle);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }

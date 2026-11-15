@@ -360,8 +360,8 @@ async fn downstream_websocket_binary_tunnel_upgrades_and_relays_frames() {
         websocket::connection::set_path(upstream, "/binary");
         let protocols = match http::request::get_header("sec-websocket-protocol") {{
             Result::Ok(present) => match present {{
-                Option::Some(text) => text,
-                Option::None => "",
+                Some(text) => text,
+                None => "",
              }},
             Result::Err(error) => "",
         }};

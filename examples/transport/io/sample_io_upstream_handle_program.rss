@@ -37,15 +37,15 @@ fn io_read_all_text(handle: int) -> string {
     }
 }
 
-// `io::read_line` reports end of stream as `Option::None` and a read failure as
+// `io::read_line` reports end of stream as `None` and a read failure as
 // the guest error instead of returning an empty string. This sample reads one
 // line for a header value, so both keep the previous empty-string default.
 fn io_line_text(handle: int) -> string {
     let value: Result<Option<string>, string> = io::read_line(handle);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }

@@ -16,7 +16,7 @@ use std::process::Command;
 use serde::Deserialize;
 
 /// The frozen core candidate this workspace migrates against.
-const FROZEN_CORE_REV: &str = "8db4583298cce9806d617322606537e6344c8b6e";
+const FROZEN_CORE_REV: &str = "2f433edab3f1907e8cb060e901357d7e2af016ce";
 const FROZEN_CORE_URL: &str = "https://github.com/rustscript-lang/rustscript.git";
 
 fn manifest_dir() -> PathBuf {

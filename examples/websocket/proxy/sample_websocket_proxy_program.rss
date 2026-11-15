@@ -106,8 +106,8 @@ fn request_header_text(name: string) -> string {
     let value: Result<Option<string>, string> = http::request::get_header(name);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }

@@ -478,8 +478,8 @@ fn request_header_text(name: string) -> string {
     let value: Result<Option<string>, string> = http::request::get_header(name);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }
@@ -492,22 +492,22 @@ fn exchange_header_text(exchange: int, name: string) -> string {
     let value: Result<Option<string>, string> = http::exchange::get_header(exchange, name);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }
 }
 
-// `io::read_line` reports end of stream as `Option::None` and a read failure as
+// `io::read_line` reports end of stream as `None` and a read failure as
 // the guest error instead of returning an empty string. The stream loop tests
 // `eof`, so an absent line keeps the previous empty-string boundary default.
 fn io_line_text(handle: int) -> string {
     let value: Result<Option<string>, string> = io::read_line(handle);
     match value {
         Result::Ok(present) => match present {
-            Option::Some(text) => text,
-            Option::None => "",
+            Some(text) => text,
+            None => "",
         },
         Result::Err(error) => "",
     }
