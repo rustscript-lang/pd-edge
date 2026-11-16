@@ -98,12 +98,15 @@ jobs:
                   if section in ('[workspace.package]', '[package]') and stripped.startswith('version = '):
                       line = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{manifest_version}"', line)
                   match = dep_re.match(line)
-                  if match and 'path' in match.group(3):
+                  if match:
                       prefix, key, body, suffix = match.groups()
                       package_match = re.search(r'package\s*=\s*"([^"]+)"', body)
                       dep_name = package_match.group(1) if package_match else key
                       dep_version = dep_versions.get(dep_name)
-                      if dep_version:
+                      if dep_version and re.search(r'(?:^|,)\s*(?:path|git)\s*=', body):
+                          # Publish against crates.io; retain package aliases and feature flags.
+                          body = re.sub(r'\b(?:path|git|rev|branch|tag)\s*=\s*"[^"]*"\s*,?\s*', '', body)
+                          body = body.rstrip().rstrip(',').rstrip()
                           if re.search(r'version\s*=\s*"[^"]*"', body):
                               body = re.sub(r'version\s*=\s*"[^"]*"', f'version = "{dep_version}"', body)
                           else:
