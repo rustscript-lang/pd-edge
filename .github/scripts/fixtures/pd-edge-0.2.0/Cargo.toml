@@ -1,0 +1,105 @@
+[workspace]
+members = [
+    ".",
+    "pd-edge-abi",
+    "pd-edge-host-function",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+
+[package]
+name = "pd-edge"
+version.workspace = true
+edition.workspace = true
+description = "RustScript edge runtime and proxy host integration"
+license = "MIT"
+homepage = "https://rustscript.org/"
+repository = "https://github.com/rustscript-lang/pd-edge"
+build = "build.rs"
+autobins = false
+
+[lib]
+name = "edge"
+
+[features]
+# Keep HTTP/3 opt-in in normal builds; release.yml enables it explicitly with --all-features.
+# Do not enable `vm/edge-abi`: frozen pd-vm's optional edge-abi depends on
+# crates.io pd-edge-abi 0.1.1 (ABI24). HTTP compiles and runs against the
+# in-tree ABI25 catalog, exact compiler overlay, and runtime descriptors.
+default = ["console", "http", "tls", "websocket"]
+console = ["http", "tls", "websocket", "edge_abi/console"]
+native-jit = ["vm/cranelift-jit"]
+http = ["edge_abi/http"]
+http2 = ["http", "edge_abi/http2", "dep:h2", "dep:tokio-rustls", "dep:webpki-roots", "dep:rustls-pemfile"]
+http3 = ["http", "dep:quinn", "dep:h3", "dep:h3-quinn", "dep:webpki-roots", "dep:rustls-pemfile", "dep:rcgen"]
+mqtt = ["tls", "edge_abi/mqtt"]
+tls = ["http", "edge_abi/tls", "dep:tokio-rustls", "dep:rcgen", "dep:webpki-roots", "dep:rustls-pemfile"]
+websocket = ["http", "edge_abi/websocket", "dep:tokio-tungstenite"]
+webrtc = ["http", "edge_abi/webrtc", "dep:webrtc"]
+
+[[bin]]
+name = "pd-edge-http-proxy"
+path = "src/bin/pd-edge-http-proxy.rs"
+
+[[bin]]
+name = "pd-edge-transport-proxy"
+path = "src/bin/pd-edge-transport-proxy.rs"
+
+[[bin]]
+name = "pd-edge-console"
+path = "src/bin/pd-edge-console.rs"
+required-features = ["console"]
+
+[[bin]]
+name = "pd-edge-sample-echo-server"
+path = "src/bin/pd-edge-sample-echo-server.rs"
+
+[dependencies]
+axum = "0.8"
+bytes = "1"
+tokio = { version = "1", features = ["full"] }
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "http2", "server"] }
+hyper-rustls = { version = "0.27", features = ["webpki-roots", "http2"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "server-auto", "client", "client-legacy", "http1", "http2"] }
+arc-swap = "1"
+socket2 = "0.5.10"
+h2 = { version = "0.4", optional = true }
+h3 = { version = "0.0.8", optional = true }
+h3-quinn = { version = "0.0.10", optional = true }
+futures-util = "0.3"
+pd-edge-host-function = { path = "./pd-edge-host-function", version = "0.1.0" }
+linkme = "0.3"
+vm = { package = "pd-vm", git = "https://github.com/rustscript-lang/rustscript.git", rev = "b1d6cffede77f49410bf63525f30b9a46b02dc01", version = "0.1.0", default-features = false, features = ["runtime"] }
+edge_abi = { package = "pd-edge-abi", path = "./pd-edge-abi", version = "0.1.0", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi"] }
+owo-colors = "4"
+supports-color = "3"
+base64 = "0.22"
+rand = "0.8"
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+tower = { version = "0.5", features = ["util"] }
+parking_lot = "0.12"
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"], optional = true }
+tokio-rustls = { version = "0.26", optional = true }
+quinn = { version = "0.11.9", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"], optional = true }
+rcgen = { version = "0.12", optional = true }
+webrtc = { version = "0.17", optional = true }
+rustls = "0.23"
+webpki-roots = { version = "1", optional = true }
+rustls-pemfile = { version = "2", optional = true }
+httparse = "1"
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "http2"] }
+
+[target.'cfg(windows)'.dependencies]
+mimalloc = "0.1"
+windows = { version = "0.58", features = ["Win32_Foundation", "Win32_System_Console"] }
