@@ -109,20 +109,18 @@ def load_plan(path: Path) -> list[Package]:
     ]
 
 
-def ensure_dependencies_indexed(packages: list[Package],
+def ensure_dependencies_indexed(package: Package, versions: dict[str, str],
                                 timeout: float, interval: float) -> None:
-    names = {package.name: package.version for package in packages}
-    for package in packages:
-        for dependency in package.dependencies:
-            if dependency not in names:
-                continue
-            expected = names[dependency]
-            if not wait_for_index(dependency, expected, timeout, interval):
-                raise SystemExit(
-                    f"{dependency} {expected} is not visible in the crates.io index; "
-                    f"refusing to publish {package.name}"
-                )
-            print(f"  dependency {dependency} {expected} is indexed")
+    for dependency in package.dependencies:
+        if dependency not in versions:
+            continue
+        expected = versions[dependency]
+        if not wait_for_index(dependency, expected, timeout, interval):
+            raise SystemExit(
+                f"{dependency} {expected} is not visible in the crates.io index; "
+                f"refusing to publish {package.name}"
+            )
+        print(f"  dependency {dependency} {expected} is indexed")
 
 
 def publish(package: Package, token: str | None, retries: int, wait: float,
@@ -193,8 +191,9 @@ def main(argv: list[str] | None = None) -> int:
         print("CARGO_REGISTRY_TOKEN is required", file=sys.stderr)
         return 1
 
+    versions = {package.name: package.version for package in packages}
     for package in packages:
-        ensure_dependencies_indexed(packages, args.index_timeout, args.index_interval)
+        ensure_dependencies_indexed(package, versions, args.index_timeout, args.index_interval)
         publish(package, token, args.retries, args.retry_delay,
                 args.index_timeout, args.index_interval)
     return 0
