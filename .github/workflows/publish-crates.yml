@@ -33,7 +33,7 @@ jobs:
       PACKAGE_ORDER: pd-edge-host-function pd-edge-abi pd-edge
       PD_VM_VERSION: ${{ inputs.pd_vm_version || '0.22.2' }}
       PD_HOST_FUNCTION_VERSION: ${{ inputs.pd_host_function_version || '0.22.2' }}
-      PUBLISH_STAGE: ${{ runner.temp }}/publish-crates
+      PUBLISH_STAGE: ${{ github.workspace }}/.publish-crates
     steps:
       - name: Checkout pd-edge
         uses: actions/checkout@v4
